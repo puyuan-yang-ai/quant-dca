@@ -1,0 +1,7 @@
+# 主配置文件
+# 指定使用的场景配置文件（相对于 config 目录）
+
+use_config: "2022-2024-bear-bull.yaml"
+# use_config: "2023-bull.yaml"
+# use_config: "2023-2025-bull-bear.yaml"
+# use_config: "2022-2024-bear-bull.yaml"
