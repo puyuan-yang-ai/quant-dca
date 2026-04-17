@@ -1,0 +1,158 @@
+"""
+技术指标计算模块
+提供 EMA、波动率档口、偏离度、最大涨跌幅等纯函数
+"""
+
+
+def calc_ema(closes, period):
+    """
+    计算 EMA（指数移动平均）序列
+
+    Args:
+        closes: 收盘价列表（按时间正序）
+        period: EMA 周期
+
+    Returns:
+        与 closes 等长的 EMA 列表。前 period-1 个值为 None（数据不足），
+        第 period 个值用 SMA 初始化，之后递推。
+    """
+    if len(closes) < period:
+        return [None] * len(closes)
+
+    alpha = 2.0 / (period + 1)
+    ema_values = [None] * len(closes)
+
+    sma = sum(closes[:period]) / period
+    ema_values[period - 1] = sma
+
+    for i in range(period, len(closes)):
+        ema_values[i] = alpha * closes[i] + (1 - alpha) * ema_values[i - 1]
+
+    return ema_values
+
+
+def calc_ema_single(closes, period):
+    """
+    计算最新一个 EMA 值（便捷函数）
+
+    Args:
+        closes: 收盘价列表（按时间正序）
+        period: EMA 周期
+
+    Returns:
+        最新的 EMA 值，数据不足时返回 None
+    """
+    ema_list = calc_ema(closes, period)
+    return ema_list[-1] if ema_list else None
+
+
+def calc_volatility_tiers(history, lookback=14, percentiles=(30, 60), max_scale=0.90):
+    """
+    计算波动率动态档口
+
+    Args:
+        history: 历史 K 线数据列表（至少 lookback+1 天），每项含 'close' 和 'low'
+        lookback: 回看天数
+        percentiles: (一档分位数, 二档分位数)
+        max_scale: 三档 = 最大跌幅 × max_scale
+
+    Returns:
+        (tier1_drop, tier2_drop, tier3_drop) 均为小数形式（如 0.02 表示 2%）
+        数据不足时返回 None
+    """
+    if len(history) < lookback + 1:
+        return None
+
+    recent = history[-(lookback + 1):]
+    drops = []
+    for i in range(1, len(recent)):
+        prev_close = recent[i - 1]['close']
+        today_low = recent[i]['low']
+        drop = max(0.0, (prev_close - today_low) / prev_close)
+        drops.append(drop)
+
+    drops.sort()
+    n = len(drops)
+
+    tier1 = _percentile(drops, percentiles[0])
+    tier2 = _percentile(drops, percentiles[1])
+    tier3 = drops[-1] * max_scale
+
+    # 最小档距约束：防止低波动时档口挤在一起
+    min_gap_12 = 0.005  # tier2 >= tier1 + 0.5%
+    min_gap_23 = 0.010  # tier3 >= tier2 + 1.0%
+
+    if tier2 < tier1 + min_gap_12:
+        tier2 = tier1 + min_gap_12
+    if tier3 < tier2 + min_gap_23:
+        tier3 = tier2 + min_gap_23
+
+    return (tier1, tier2, tier3)
+
+
+def calc_deviation(close, ema):
+    """
+    计算偏离度
+
+    Args:
+        close: 收盘价
+        ema: EMA 值
+
+    Returns:
+        偏离度 = (close - ema) / ema，EMA 为 0 或 None 时返回 0.0
+    """
+    if not ema or ema == 0:
+        return 0.0
+    return (close - ema) / ema
+
+
+def calc_max_abs_change(history, lookback=7):
+    """
+    计算近 N 日最大涨跌幅绝对值
+
+    Args:
+        history: 历史 K 线数据列表，每项含 'close'
+        lookback: 回看天数
+
+    Returns:
+        最大 |日涨跌幅|，数据不足时返回 0.0
+    """
+    if len(history) < 2:
+        return 0.0
+
+    recent = history[-lookback - 1:] if len(history) > lookback + 1 else history
+    max_change = 0.0
+
+    for i in range(1, len(recent)):
+        prev_close = recent[i - 1]['close']
+        if prev_close <= 0:
+            continue
+        change = abs((recent[i]['close'] - prev_close) / prev_close)
+        max_change = max(max_change, change)
+
+    return max_change
+
+
+def _percentile(sorted_list, pct):
+    """
+    计算已排序列表的分位数（线性插值法）
+
+    Args:
+        sorted_list: 已从小到大排序的列表
+        pct: 分位数 (0-100)
+
+    Returns:
+        分位数值
+    """
+    if not sorted_list:
+        return 0.0
+
+    n = len(sorted_list)
+    k = (pct / 100.0) * (n - 1)
+    f = int(k)
+    c = f + 1
+
+    if f >= n - 1:
+        return sorted_list[-1]
+
+    return sorted_list[f] + (k - f) * (sorted_list[c] - sorted_list[f])
