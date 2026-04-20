@@ -23,7 +23,7 @@ env/
 Thumbs.db
 
 # Cursor / SpecStory
-.specstory/
+# .specstory/
 .cursor/
 
 # Jupyter
@@ -31,3 +31,4 @@ Thumbs.db
 
 # Output (generated charts, can be regenerated)
 output/*.png
+output/*.html
