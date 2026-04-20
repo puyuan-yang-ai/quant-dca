@@ -10,8 +10,19 @@ SOXL/SMH 多层次定投（DCA）回测系统。在不同市场环境（熊市�
 
 ## 常用命令
 
+### 脚本一览
+
+| 脚本 | 用途 | 使用场景 |
+|------|------|---------|
+| `bash show_chart.sh` | 交互式图表（K 线 + RSI 副图），启动 HTTP 服务 | 可视化查看策略回测效果 |
+| `python scripts/compare_signals.py` | 信号策略比较（标准化执行，纯比较择时质量） | 快速筛选最优 Entry 模块 |
+| `python run_experiments.py` | 4 阶段执行层参数优化（网格搜索） | 锁定信号后精细调优执行参数 |
+| `python main.py` | 单次回测（旧版路径，YAML 配置） | 简单的 baseline 策略回测 |
+
+### 详细用法
+
 ```bash
-# 交互式图表（引擎路径，启动 HTTP 服务，浏览器访问）
+# ── 交互式图表 ──
 bash show_chart.sh                        # 默认 bear-bull 环境 + best 策略
 bash show_chart.sh --env all              # 全量数据（2010-2025）
 bash show_chart.sh --env bear             # 纯熊市（2022）
@@ -21,16 +32,16 @@ bash show_chart.sh --env bull-bear        # 牛转熊（2022.10-2025.04）
 bash show_chart.sh --strategy baseline    # 使用 baseline 策略（默认 best）
 bash show_chart.sh --port 9871            # 指定端口（默认 9870）
 
-# 运行单次回测（旧版路径，通过 config/settings.yaml 选择场景配置）
-python main.py [--start-date YYYY-MM-DD] [--end-date YYYY-MM-DD]
+# ── 信号策略比较（快速迭代用） ──
+# 标准化执行（市价买1股、无限价单、不止盈），5 个环境自动跑完
+# 输出对比表格 + 加权 Sharpe 排名，秒级完成
+python scripts/compare_signals.py
 
-# 运行完整 4 阶段实验流水线（所有策略组合 × 所有市场环境）
+# ── 执行层参数优化（精细调优用） ──
 python run_experiments.py
 
-# 辅助脚本
-python scripts/plot_smh_open.py
-python scripts/plot_signals.py
-python scripts/run_sota_comparison.py
+# ── 旧版路径 ──
+python main.py [--start-date YYYY-MM-DD] [--end-date YYYY-MM-DD]
 ```
 
 目前没有配置测试框架。`tests/test_strategies.py` 存在但为空文件。
@@ -67,6 +78,19 @@ python scripts/run_sota_comparison.py
 每阶段在 5 个市场环境（bear / bull / bear-bull / bull-bear / all）下测试所有变体，使用加权综合 Sharpe/Calmar 评分。每阶段最优模块锁定后传递至下一阶段。结果输出到 `experiments_result/`。
 
 实验参数配置在 `experiments/configs.py`（Python 代码，非 YAML）。报告由 `experiments/reporter.py` 生成。最优策略组合 `BEST_*` 常量也定义在 `configs.py` 中。
+
+### 信号策略比较
+
+比较不同信号策略（Entry 模块）时，使用**标准化执行层**：统一用最简配置（市价单买 1 股、无限价单、不止盈），消除执行层差异，纯粹比较信号质量。
+
+```python
+# 标准化执行层（所有信号比较统一使用）
+tiers    = FixedTiers(drops=())           # 只有市价单
+position = FixedPyramid(market_shares=1)  # 固定买 1 股
+take_profit = NoTakeProfit()              # 不止盈
+```
+
+流程：先用标准化执行快速筛信号 → 找到最优信号后再精细调优执行层参数。详见 `docs/tasks/260419-xxx/strategy-comparison-guide.md`。
 
 ### 交互式图表
 
