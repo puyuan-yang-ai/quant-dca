@@ -213,14 +213,14 @@ def _build_html(title, candles, ema_data, markers, summary,
 // ═══════════════════════════════════════════════════
 
 const rsiChart = LightweightCharts.createChart(document.getElementById('rsi-chart'), {{
-  layout: {{ background: {{ color: '#131722' }}, textColor: '#d1d4dc' }},
+  layout: {{ background: {{ color: initTheme.bg }}, textColor: initTheme.text }},
   grid: {{
-    vertLines: {{ color: '#1e222d' }},
-    horzLines: {{ color: '#1e222d' }},
+    vertLines: {{ color: initTheme.grid }},
+    horzLines: {{ color: initTheme.grid }},
   }},
   crosshair: {{ mode: LightweightCharts.CrosshairMode.Normal }},
-  timeScale: {{ timeVisible: false, borderColor: '#2a2e39' }},
-  rightPriceScale: {{ borderColor: '#2a2e39', scaleMargins: {{ top: 0.05, bottom: 0.05 }} }},
+  timeScale: {{ timeVisible: false, borderColor: initTheme.border }},
+  rightPriceScale: {{ borderColor: initTheme.border, scaleMargins: {{ top: 0.05, bottom: 0.05 }} }},
 }});
 
 // RSI 曲线（紫色）
@@ -251,19 +251,21 @@ if (rsiMarkers.length > 0) {{
   rsiSeries.setMarkers(rsiMarkers);
 }}
 
-// 同步主图和 RSI 副图的时间轴
+// 同步主图和 RSI 副图的时间轴（使用 TimeRange 而非 LogicalRange，
+// 因为两图数据点数量不同——RSI 前 14 根为 None 被跳过，
+// 用 LogicalRange 会导致偏移）
 let isSyncing = false;
-chart.timeScale().subscribeVisibleLogicalRangeChange(range => {{
+chart.timeScale().subscribeVisibleTimeRangeChange(range => {{
   if (range && !isSyncing) {{
     isSyncing = true;
-    rsiChart.timeScale().setVisibleLogicalRange(range);
+    rsiChart.timeScale().setVisibleRange(range);
     isSyncing = false;
   }}
 }});
-rsiChart.timeScale().subscribeVisibleLogicalRangeChange(range => {{
+rsiChart.timeScale().subscribeVisibleTimeRangeChange(range => {{
   if (range && !isSyncing) {{
     isSyncing = true;
-    chart.timeScale().setVisibleLogicalRange(range);
+    chart.timeScale().setVisibleRange(range);
     isSyncing = false;
   }}
 }});
@@ -298,40 +300,99 @@ window.addEventListener('resize', () => {{
 <title>{title}</title>
 <style>
   * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-  body {{ background: #131722; color: #d1d4dc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }}
+  body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; transition: background 0.3s, color 0.3s; }}
+  body.dark {{ background: #131722; color: #d1d4dc; }}
+  body.light {{ background: #ffffff; color: #333333; }}
   #header {{
     padding: 12px 20px; display: flex; align-items: center; gap: 24px;
-    background: #1e222d; border-bottom: 1px solid #2a2e39;
+    transition: background 0.3s, border-color 0.3s;
   }}
+  body.dark #header {{ background: #1e222d; border-bottom: 1px solid #2a2e39; }}
+  body.light #header {{ background: #f0f3fa; border-bottom: 1px solid #d6dcde; }}
   #header h1 {{ font-size: 16px; font-weight: 600; }}
-  .stat {{ font-size: 13px; color: #787b86; }}
-  .stat span {{ color: #d1d4dc; font-weight: 500; }}
+  .stat {{ font-size: 13px; }}
+  body.dark .stat {{ color: #787b86; }}
+  body.light .stat {{ color: #888; }}
+  body.dark .stat span {{ color: #d1d4dc; font-weight: 500; }}
+  body.light .stat span {{ color: #333; font-weight: 500; }}
+  #theme-toggle {{
+    margin-left: auto; cursor: pointer; font-size: 18px;
+    background: none; border: 1px solid #555; border-radius: 6px;
+    padding: 4px 10px; transition: all 0.3s;
+  }}
+  body.dark #theme-toggle {{ color: #d1d4dc; border-color: #555; }}
+  body.light #theme-toggle {{ color: #333; border-color: #ccc; }}
+  #theme-toggle:hover {{ opacity: 0.7; }}
   #chart {{ width: 100%; height: {main_height}; }}
-  #rsi-chart {{ width: 100%; height: {rsi_height}; border-top: 1px solid #2a2e39; }}
+  #rsi-chart {{ width: 100%; height: {rsi_height}; }}
+  body.dark #rsi-chart {{ border-top: 1px solid #2a2e39; }}
+  body.light #rsi-chart {{ border-top: 1px solid #d6dcde; }}
 </style>
 </head>
-<body>
+<body class="dark">
 <div id="header">
   <h1>{title}</h1>
   <div class="stat">收益率 <span>{summary['total_return']}</span></div>
   <div class="stat">夏普 <span>{summary['sharpe']}</span></div>
   <div class="stat">最大回撤 <span>{summary['max_drawdown']}</span></div>
   <div class="stat">交易 <span>{summary['trade_count']} 笔</span></div>
+  <button id="theme-toggle" onclick="toggleTheme()">&#9788;</button>
 </div>
 <div id="chart"></div>
 {rsi_div_html}
 
 <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
 <script>
+// ═══════════════════════════════════════════════════
+//  主题配置
+// ═══════════════════════════════════════════════════
+const themes = {{
+  dark: {{
+    bg: '#131722', text: '#d1d4dc',
+    grid: '#1e222d', border: '#2a2e39',
+  }},
+  light: {{
+    bg: '#ffffff', text: '#333333',
+    grid: '#f0f0f0', border: '#d6dcde',
+  }},
+}};
+let currentTheme = localStorage.getItem('chartTheme') || 'dark';
+
+function applyTheme(theme) {{
+  const t = themes[theme];
+  document.body.className = theme;
+  const btn = document.getElementById('theme-toggle');
+  btn.textContent = theme === 'dark' ? '\u2606' : '\u2605';
+
+  const chartOpts = {{
+    layout: {{ background: {{ color: t.bg }}, textColor: t.text }},
+    grid: {{ vertLines: {{ color: t.grid }}, horzLines: {{ color: t.grid }} }},
+    timeScale: {{ borderColor: t.border }},
+    rightPriceScale: {{ borderColor: t.border }},
+  }};
+  chart.applyOptions(chartOpts);
+  if (typeof rsiChart !== 'undefined') rsiChart.applyOptions(chartOpts);
+  localStorage.setItem('chartTheme', theme);
+}}
+
+function toggleTheme() {{
+  currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+  applyTheme(currentTheme);
+}}
+
+// ═══════════════════════════════════════════════════
+//  主图
+// ═══════════════════════════════════════════════════
+const initTheme = themes[currentTheme];
 const chart = LightweightCharts.createChart(document.getElementById('chart'), {{
-  layout: {{ background: {{ color: '#131722' }}, textColor: '#d1d4dc' }},
+  layout: {{ background: {{ color: initTheme.bg }}, textColor: initTheme.text }},
   grid: {{
-    vertLines: {{ color: '#1e222d' }},
-    horzLines: {{ color: '#1e222d' }},
+    vertLines: {{ color: initTheme.grid }},
+    horzLines: {{ color: initTheme.grid }},
   }},
   crosshair: {{ mode: LightweightCharts.CrosshairMode.Normal }},
-  timeScale: {{ timeVisible: false, borderColor: '#2a2e39' }},
-  rightPriceScale: {{ borderColor: '#2a2e39' }},
+  timeScale: {{ timeVisible: false, borderColor: initTheme.border }},
+  rightPriceScale: {{ borderColor: initTheme.border }},
 }});
 
 // K 线
@@ -369,6 +430,9 @@ window.addEventListener('resize', () => {{
 }});
 
 {rsi_js}
+
+// 应用保存的主题偏好
+if (currentTheme === 'light') applyTheme('light');
 </script>
 </body>
 </html>'''
