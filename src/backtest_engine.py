@@ -5,6 +5,7 @@
 from src.indicators import calc_ema, calc_deviation
 from src.portfolio import Portfolio
 from src.metrics import calc_all_metrics, calc_daily_returns
+from src.rsi_signals import calc_rsi_v2_signals
 
 
 class Context:
@@ -77,6 +78,7 @@ class BacktestEngine:
         order_stats = {}
         limit_orders_placed = 0
         limit_orders_filled = 0
+        trade_log = []  # 每笔交易记录，用于交互式图表标注
 
         first_close = self.data[0]['close']
         smh_first = self._smh_by_date.get(self.data[0]['date'])
@@ -121,6 +123,10 @@ class BacktestEngine:
                 _, profit = portfolio.sell_soxl(
                     tp['sell_pct'], tp['trigger_price'], self.fee_rate
                 )
+                trade_log.append({
+                    'date': day['date'], 'type': 'tp_sell',
+                    'price': tp['trigger_price'], 'profit': profit,
+                })
                 if profit > 0 and smh_day:
                     portfolio.divert_to_smh(
                         profit, smh_day['close'], self.fee_rate
@@ -142,6 +148,12 @@ class BacktestEngine:
 
                 if is_market or day['low'] <= target_price:
                     cost = portfolio.buy_soxl(shares, target_price, self.fee_rate)
+                    trade_log.append({
+                        'date': day['date'],
+                        'type': 'market_buy' if is_market else 'limit_buy',
+                        'price': target_price, 'shares': shares,
+                        'tier': price_ratio,
+                    })
 
                     if not is_market:
                         limit_orders_filled += 1
@@ -219,6 +231,8 @@ class BacktestEngine:
             'sell_count': portfolio.sell_count,
             'tp_trigger_count': portfolio.tp_trigger_count,
             'tp_expire_count': portfolio.tp_expire_count,
+            'trade_log': trade_log,
+            'ema_series': ema_series,
             # 图表数据
             'dates': dates,
             'daily_values': daily_values,
@@ -227,6 +241,8 @@ class BacktestEngine:
             'daily_dca_returns': daily_dca_returns,
             'daily_hold_returns': daily_hold_returns,
             'daily_smh_returns': daily_smh_returns,
+            # RSI v2 指标数据（用于副图可视化）
+            'rsi_v2': calc_rsi_v2_signals(self.data),
         })
 
         return metrics

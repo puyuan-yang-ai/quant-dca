@@ -1,0 +1,284 @@
+// ════════════════════════════════════════════════════════════
+// MOST on RSI v2 — RSI×快均线交叉 + 三事件信号系统
+//
+// 三个独立触发事件：
+//   事件1: RSI 下破/上破极端阈值 → B/S（左侧预警）
+//   事件2: RSI 上穿/下穿快均线 + 门槛 → B/B+/B++（右侧确认）
+//   事件3: 实时背离检测 → 直接 B+/S+，近期有交叉可升级 B++/S++
+//
+// 背离检测：价格创 N 根新低但 RSI 未创新低 = 看涨背离（实时，零延迟）
+// ════════════════════════════════════════════════════════════
+
+//@version=5
+indicator(title="MOST on RSI v2", shorttitle="MOSTRSI-v2", format=format.price, precision=2, timeframe="", timeframe_gaps=true)
+
+
+// ── VAR 自适应均线函数（保留自 v1）──────────────────────────
+Var_Func(source, length) =>
+    valpha = 2 / (length + 1)
+    vud1 = source > source[1] ? source - source[1] : 0
+    vdd1 = source < source[1] ? source[1] - source : 0
+    vUD = math.sum(vud1, 9)
+    vDD = math.sum(vdd1, 9)
+    vCMO = nz((vUD - vDD) / (vUD + vDD))
+    VAR = 0.0
+    VAR := nz(valpha * math.abs(vCMO) * source) + (1 - valpha * math.abs(vCMO)) * nz(VAR[1])
+    VAR
+
+
+// ── 均线计算函数 ──────────────────────────────────────────
+ma(source, length, type) =>
+    switch type
+        "EMA" => ta.ema(source, length)
+        "VAR" => Var_Func(source, length)
+
+
+// ══════════════════════════════════════════════════════════
+//  输入参数
+// ══════════════════════════════════════════════════════════
+
+// ── RSI 参数 ─────────────────────────────────────────────
+rsiLengthInput = input.int(14, minval=1, title="RSI Length", group="RSI Settings")
+rsiSourceInput = input.source(close, "Source", group="RSI Settings")
+
+// ── 均线参数 ─────────────────────────────────────────────
+maTypeInput    = input.string("EMA", title="MA Type", options=["EMA", "VAR"], group="MA Settings")
+fastLenInput   = input.int(5,  title="Fast MA Length", minval=1, group="MA Settings")
+
+// ── 信号参数 ─────────────────────────────────────────────
+buyGate        = input.int(40, title="Buy Gate (RSI below)",       minval=0, maxval=100, group="Signal Settings")
+sellGate       = input.int(60, title="Sell Gate (RSI above)",      minval=0, maxval=100, group="Signal Settings")
+extremeBuy     = input.int(30, title="Extreme Buy (RSI below)",    minval=0, maxval=100, group="Signal Settings")
+extremeSell    = input.int(70, title="Extreme Sell (RSI above)",   minval=0, maxval=100, group="Signal Settings")
+crossLookback  = input.int(5,  title="Cross Lookback (bars)",      minval=1, maxval=50,  group="Signal Settings")
+showSignals    = input.bool(true, title="Show Signals", group="Signal Settings")
+
+// ── 背离参数 ─────────────────────────────────────────────
+divWindow      = input.int(14, title="Divergence Window (bars)",   minval=5, maxval=100, group="Divergence Settings")
+
+
+// ══════════════════════════════════════════════════════════
+//  第一层：RSI 计算
+// ══════════════════════════════════════════════════════════
+
+up   = ta.rma(math.max(ta.change(rsiSourceInput), 0), rsiLengthInput)
+down = ta.rma(-math.min(ta.change(rsiSourceInput), 0), rsiLengthInput)
+rsi  = down == 0 ? 100 : up == 0 ? 0 : 100 - (100 / (1 + up / down))
+
+
+// ══════════════════════════════════════════════════════════
+//  第二层：快均线计算（仅一条）
+// ══════════════════════════════════════════════════════════
+
+fastMA = ma(rsi, fastLenInput, maTypeInput)
+
+
+// ══════════════════════════════════════════════════════════
+//  背离检测（简化版：实时检测，零延迟）
+// ══════════════════════════════════════════════════════════
+//
+// 逻辑：在 divWindow 范围内找到"之前的价格低点"，
+//       如果当前价格更低、但 RSI 更高 → 看涨背离。
+//       最少间隔 2 根 K 线，避免相邻 bar 的噪音比较。
+//
+// 相比 v1 的 pivot 方案：无需等 lookbackRight 根确认，
+// 当下就能检测到背离，信号零延迟。
+
+DIV_MIN_SEP = 2  // 参考低点至少在 2 根前，避免相邻 bar 噪音
+
+// ── 看涨背离：价格创新低，RSI 未创新低 ──────────────────
+// 约束：参考点 A 的 RSI 必须 ≤ extremeBuy(30)，确保 A 是真正的超卖低点
+// 否则两个"不太低"的点之间的 RSI 差异没有意义
+refBuyOffset  = ta.lowestbars(low[DIV_MIN_SEP], divWindow - DIV_MIN_SEP)
+refBuyBack    = math.abs(refBuyOffset) + DIV_MIN_SEP
+bullDivRaw    = low < low[refBuyBack] and rsi > rsi[refBuyBack] and rsi[refBuyBack] <= extremeBuy
+bullDivAlert  = bullDivRaw and not bullDivRaw[1]   // 去重：仅首次触发
+
+// ── 看跌背离：价格创新高，RSI 未创新高 ──────────────────
+// 约束：参考点 A 的 RSI 必须 ≥ extremeSell(70)，确保 A 是真正的超买高点
+refSellOffset = ta.highestbars(high[DIV_MIN_SEP], divWindow - DIV_MIN_SEP)
+refSellBack   = math.abs(refSellOffset) + DIV_MIN_SEP
+bearDivRaw    = high > high[refSellBack] and rsi < rsi[refSellBack] and rsi[refSellBack] >= extremeSell
+bearDivAlert  = bearDivRaw and not bearDivRaw[1]   // 去重：仅首次触发
+
+
+// ══════════════════════════════════════════════════════════
+//  事件追踪（用于双向检查）
+// ══════════════════════════════════════════════════════════
+
+// ── 追踪背离事件（事件2 正向检查用）─────────────────────
+var int barsSinceBullDiv = 99999
+var int barsSinceBearDiv = 99999
+
+if bullDivAlert
+    barsSinceBullDiv := 0
+else
+    barsSinceBullDiv += 1
+
+if bearDivAlert
+    barsSinceBearDiv := 0
+else
+    barsSinceBearDiv += 1
+
+recentBullDiv = barsSinceBullDiv <= divWindow
+recentBearDiv = barsSinceBearDiv <= divWindow
+
+
+// ══════════════════════════════════════════════════════════
+//  第三层：三事件信号系统
+// ══════════════════════════════════════════════════════════
+
+// ── 事件 1：RSI 下破/上破极端阈值（左侧预警）─────────────
+rsiBelowExtreme = ta.crossunder(rsi, extremeBuy)     // RSI 下穿 30
+rsiAboveExtreme = ta.crossover(rsi, extremeSell)     // RSI 上穿 70
+
+// ── 事件 2：RSI 与快均线交叉 + 门槛 + 升级 ────────────────
+rsiCrossUp   = ta.crossover(rsi, fastMA)      // RSI 上穿快均线
+rsiCrossDown = ta.crossunder(rsi, fastMA)     // RSI 下穿快均线
+
+// 门槛检查：过去 crossLookback 根内 RSI 曾进入买入/卖出区域
+crossBuyGate  = ta.lowest(rsi, crossLookback) < buyGate
+crossSellGate = ta.highest(rsi, crossLookback) > sellGate
+
+// 买入方向：RSI 上穿快均线 + 门槛通过
+buyEvent2 = rsiCrossUp and crossBuyGate
+
+// 买入评分：基础 1 分，极端 +1（用 divWindow 窗口），近期背离 +1（正向检查）
+buyE2Score = buyEvent2 ? 1 + (ta.lowest(rsi, divWindow) < extremeBuy ? 1 : 0) + (recentBullDiv ? 1 : 0) : 0
+
+// 卖出方向：RSI 下穿快均线 + 门槛通过
+sellEvent2 = rsiCrossDown and crossSellGate
+
+// 卖出评分：基础 1 分，极端 +1（用 divWindow 窗口），近期背离 +1（正向检查）
+sellE2Score = sellEvent2 ? 1 + (ta.highest(rsi, divWindow) > extremeSell ? 1 : 0) + (recentBearDiv ? 1 : 0) : 0
+
+// ── 追踪有效交叉事件（事件3 反向检查用）──────────────────
+var int barsSinceBuyCross = 99999
+var int barsSinceSellCross = 99999
+
+if buyEvent2
+    barsSinceBuyCross := 0
+else
+    barsSinceBuyCross += 1
+
+if sellEvent2
+    barsSinceSellCross := 0
+else
+    barsSinceSellCross += 1
+
+// ── 事件 3：背离 + 反向检查 ───────────────────────────────
+// 背离检测时，回看 crossLookback 根内是否有有效交叉
+recentBuyCross  = barsSinceBuyCross  <= crossLookback
+recentSellCross = barsSinceSellCross <= crossLookback
+
+// 背离评分：基础 2 分（高置信度），近期有效交叉 +1（反向检查）
+bullDivScore = bullDivAlert ? 2 + (recentBuyCross ? 1 : 0) : 0
+bearDivScore = bearDivAlert ? 2 + (recentSellCross ? 1 : 0) : 0
+
+
+// ══════════════════════════════════════════════════════════
+//  绘制信号标签
+// ══════════════════════════════════════════════════════════
+
+// ── 事件 1：RSI 下破/上破极端阈值 → B / S ─────────────────
+plotshape(showSignals and rsiBelowExtreme,
+     title='B (Extreme)', text='B',
+     location=location.bottom, style=shape.labelup,
+     size=size.small, color=color.green, textcolor=color.white)
+
+plotshape(showSignals and rsiAboveExtreme,
+     title='S (Extreme)', text='S',
+     location=location.top, style=shape.labeldown,
+     size=size.small, color=color.red, textcolor=color.white)
+
+// ── 事件 2：RSI 与快均线交叉 → B/B+/B++ / S/S+/S++ ───────
+plotshape(showSignals and buyE2Score >= 3,
+     title='B++ (Cross)', text='B++',
+     location=location.bottom, style=shape.labelup,
+     size=size.large, color=color.green, textcolor=color.white)
+
+plotshape(showSignals and buyE2Score == 2,
+     title='B+ (Cross)', text='B+',
+     location=location.bottom, style=shape.labelup,
+     size=size.normal, color=color.green, textcolor=color.white)
+
+plotshape(showSignals and buyE2Score == 1,
+     title='B (Cross)', text='B',
+     location=location.bottom, style=shape.labelup,
+     size=size.small, color=color.green, textcolor=color.white)
+
+plotshape(showSignals and sellE2Score >= 3,
+     title='S++ (Cross)', text='S++',
+     location=location.top, style=shape.labeldown,
+     size=size.large, color=color.red, textcolor=color.white)
+
+plotshape(showSignals and sellE2Score == 2,
+     title='S+ (Cross)', text='S+',
+     location=location.top, style=shape.labeldown,
+     size=size.normal, color=color.red, textcolor=color.white)
+
+plotshape(showSignals and sellE2Score == 1,
+     title='S (Cross)', text='S',
+     location=location.top, style=shape.labeldown,
+     size=size.small, color=color.red, textcolor=color.white)
+
+// ── 事件 3：背离 → B+/B++ / S+/S++（画在当前 bar）─────────
+plotshape(showSignals and bullDivScore >= 3,
+     title='B++ (Div)', text='B++',
+     location=location.bottom, style=shape.labelup,
+     size=size.large, color=color.green, textcolor=color.white)
+
+plotshape(showSignals and bullDivScore == 2,
+     title='B+ (Div)', text='B+',
+     location=location.bottom, style=shape.labelup,
+     size=size.normal, color=color.green, textcolor=color.white)
+
+plotshape(showSignals and bearDivScore >= 3,
+     title='S++ (Div)', text='S++',
+     location=location.top, style=shape.labeldown,
+     size=size.large, color=color.red, textcolor=color.white)
+
+plotshape(showSignals and bearDivScore == 2,
+     title='S+ (Div)', text='S+',
+     location=location.top, style=shape.labeldown,
+     size=size.normal, color=color.red, textcolor=color.white)
+
+
+// ══════════════════════════════════════════════════════════
+//  绘制图表线条
+// ══════════════════════════════════════════════════════════
+
+rsiPlot = plot(rsi, "RSI", color=#7E57C2)
+plot(fastMA, "Fast MA", color=#FF9800, linewidth=2)   // 橙黄色加粗
+
+
+// ══════════════════════════════════════════════════════════
+//  水平参考线 + 渐变填充
+// ══════════════════════════════════════════════════════════
+
+rsiUpperBand = hline(70, "RSI Upper Band", color=#787B86)
+midline      = hline(50, "RSI Middle Band", color=color.new(#787B86, 50))
+rsiLowerBand = hline(30, "RSI Lower Band",  color=#787B86)
+fill(rsiUpperBand, rsiLowerBand, color=color.rgb(126, 87, 194, 90), title="RSI Background Fill")
+
+midLinePlot = plot(50, color=na, editable=false, display=display.none)
+fill(rsiPlot, midLinePlot, 100, 70, top_color=color.new(color.green, 0), bottom_color=color.new(color.green, 100), title="Overbought Gradient Fill")
+fill(rsiPlot, midLinePlot, 30,  0,  top_color=color.new(color.red, 100), bottom_color=color.new(color.red, 0),     title="Oversold Gradient Fill")
+
+
+// ══════════════════════════════════════════════════════════
+//  报警条件
+// ══════════════════════════════════════════════════════════
+
+alertcondition(rsiBelowExtreme,    title='B (Extreme)',  message='RSI 下破极端阈值 → B')
+alertcondition(rsiAboveExtreme,    title='S (Extreme)',  message='RSI 上破极端阈值 → S')
+alertcondition(buyE2Score >= 3,    title='B++ (Cross)',  message='强买入信号 B++（交叉 + 极端 + 背离）')
+alertcondition(buyE2Score == 2,    title='B+ (Cross)',   message='中等买入信号 B+（交叉 + 升级）')
+alertcondition(buyE2Score == 1,    title='B (Cross)',    message='基础买入信号 B（交叉）')
+alertcondition(sellE2Score >= 3,   title='S++ (Cross)',  message='强卖出信号 S++（交叉 + 极端 + 背离）')
+alertcondition(sellE2Score == 2,   title='S+ (Cross)',   message='中等卖出信号 S+（交叉 + 升级）')
+alertcondition(sellE2Score == 1,   title='S (Cross)',    message='基础卖出信号 S（交叉）')
+alertcondition(bullDivScore >= 3,  title='B++ (Div)',    message='背离 + 近期交叉 → B++')
+alertcondition(bullDivScore == 2,  title='B+ (Div)',     message='看涨背离 → B+')
+alertcondition(bearDivScore >= 3,  title='S++ (Div)',    message='背离 + 近期交叉 → S++')
+alertcondition(bearDivScore == 2,  title='S+ (Div)',     message='看跌背离 → S+')

@@ -16,6 +16,7 @@ MARKET_ENVS = {
     'bull':      {'start': '2022-10-10', 'end': '2024-07-08', 'weight': 0.15, 'label': '纯牛市'},
     'bear-bull': {'start': '2022-01-01', 'end': '2024-07-08', 'weight': 0.35, 'label': '熊转牛'},
     'bull-bear': {'start': '2022-10-14', 'end': '2025-04-08', 'weight': 0.35, 'label': '牛转熊'},
+    'all':       {'start': '2010-03-12', 'end': '2025-11-04', 'weight': 0.00, 'label': '全量数据'},
 }
 
 DATA_FILE = 'data/SOXL_adjusted.csv'
@@ -28,6 +29,13 @@ DEFAULT_TIERS = FixedTiers(drops=(0.02, 0.05, 0.10))
 DEFAULT_ENTRY = UnconditionalEntry()
 DEFAULT_POSITION = FixedPyramid(market_shares=0.70, limit_shares=(0.40, 0.25, 0.15))
 DEFAULT_TP = NoTakeProfit()
+
+# ── 最优组合（实验结果：1-A + 2-C-5 + 3-B + 4-0） ───────────
+
+BEST_TIERS = FixedTiers(drops=(0.02, 0.05, 0.10))       # 1-A
+BEST_ENTRY = NDayConfirmEntry(n_days=5)                   # 2-C-5
+BEST_POSITION = AdaptivePyramid()                         # 3-B
+BEST_TP = NoTakeProfit()                                  # 4-0
 
 
 # ── 第一阶段：档口设置 ──────────────────────────────────────

@@ -1,6 +1,6 @@
 """
 技术指标计算模块
-提供 EMA、波动率档口、偏离度、最大涨跌幅等纯函数
+提供 EMA、RSI、波动率档口、偏离度、最大涨跌幅等纯函数
 """
 
 
@@ -29,6 +29,61 @@ def calc_ema(closes, period):
         ema_values[i] = alpha * closes[i] + (1 - alpha) * ema_values[i - 1]
 
     return ema_values
+
+
+def calc_rsi(closes, period=14):
+    """
+    计算 Wilder RSI 序列
+
+    使用 Wilder 平滑（RMA）计算，与 TradingView 的 ta.rsi() 一致。
+
+    Args:
+        closes: 收盘价列表（按时间正序）
+        period: RSI 周期（默认 14）
+
+    Returns:
+        与 closes 等长的 RSI 列表。前 period 个值为 None（数据不足），
+        之后为 0-100 的 RSI 值。
+    """
+    n = len(closes)
+    if n < period + 1:
+        return [None] * n
+
+    rsi_values = [None] * n
+
+    # 计算每日涨跌
+    gains = []
+    losses = []
+    for i in range(1, n):
+        change = closes[i] - closes[i - 1]
+        gains.append(max(change, 0.0))
+        losses.append(max(-change, 0.0))
+
+    # 第一个 RMA 值用 SMA 初始化（索引 period-1 对应 closes 的 period）
+    avg_gain = sum(gains[:period]) / period
+    avg_loss = sum(losses[:period]) / period
+
+    if avg_loss == 0:
+        rsi_values[period] = 100.0
+    elif avg_gain == 0:
+        rsi_values[period] = 0.0
+    else:
+        rsi_values[period] = 100.0 - 100.0 / (1.0 + avg_gain / avg_loss)
+
+    # Wilder 平滑递推（RMA）
+    for i in range(period, len(gains)):
+        avg_gain = (avg_gain * (period - 1) + gains[i]) / period
+        avg_loss = (avg_loss * (period - 1) + losses[i]) / period
+
+        idx = i + 1  # gains/losses 的索引比 closes 偏移 1
+        if avg_loss == 0:
+            rsi_values[idx] = 100.0
+        elif avg_gain == 0:
+            rsi_values[idx] = 0.0
+        else:
+            rsi_values[idx] = 100.0 - 100.0 / (1.0 + avg_gain / avg_loss)
+
+    return rsi_values
 
 
 def calc_ema_single(closes, period):
