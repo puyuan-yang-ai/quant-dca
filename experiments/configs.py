@@ -16,10 +16,10 @@ MARKET_ENVS = {
     'bull':      {'start': '2022-10-10', 'end': '2024-07-08', 'weight': 0.15, 'label': '纯牛市'},
     'bear-bull': {'start': '2022-01-01', 'end': '2024-07-08', 'weight': 0.35, 'label': '熊转牛'},
     'bull-bear': {'start': '2022-10-14', 'end': '2025-04-08', 'weight': 0.35, 'label': '牛转熊'},
-    'all':       {'start': '2010-03-12', 'end': '2025-11-04', 'weight': 0.00, 'label': '全量数据'},
+    'all':       {'start': '1993-01-29', 'end': '2025-11-04', 'weight': 0.00, 'label': '全量数据'},
 }
 
-DATA_FILE = 'data/SOXL_adjusted.csv'
+DATA_FILE = 'data/SPY_adjusted.csv'
 SMH_FILE = 'data/SMH_adjusted.csv'
 FEE_RATE = 0.01
 

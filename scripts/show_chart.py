@@ -75,7 +75,7 @@ def main():
           f"最大回撤：{metrics['max_drawdown']*100:.1f}%")
     print(f"交易记录：{len(metrics.get('trade_log', []))} 笔")
 
-    title = f"SOXL DCA [{strat_config['label']}] — {env['label']}（{env['start']} ~ {env['end']}）"
+    title = f"SPY DCA [{strat_config['label']}] — {env['label']}（{env['start']} ~ {env['end']}）"
     show_interactive_chart(data, metrics, title=title, port=args.port)
 
 

@@ -209,6 +209,85 @@ def calc_calmar_ratio(annualized_return, max_drawdown):
     return annualized_return / max_drawdown
 
 
+def calc_benchmark_sharpe(close_prices, annualized_return, risk_free_rate=0.0):
+    """
+    基准可比 Sharpe（可与买入持有直接对标）
+
+    分子：DCA 策略的年化收益率（来自实际投入和最终市值）
+    分母：标的资产（SPY）本身的年化波动率
+
+    原理：DCA 策略持有的就是 SPY，承受的风险就是 SPY 的波动率。
+    用 SPY 波动率做分母，使得 DCA 策略的 Sharpe 可以直接与
+    SPY 买入持有的 Sharpe（约 0.6~0.7）对比。
+
+    如果 DCA Sharpe > 买入持有 Sharpe → 择时产生了正向价值
+    如果 DCA Sharpe < 买入持有 Sharpe → 择时不如买入持有
+    """
+    if len(close_prices) < 2:
+        return 0.0
+
+    stock_returns = []
+    for i in range(1, len(close_prices)):
+        if close_prices[i - 1] > 0:
+            stock_returns.append(
+                (close_prices[i] - close_prices[i - 1]) / close_prices[i - 1]
+            )
+
+    if not stock_returns:
+        return 0.0
+
+    mean = sum(stock_returns) / len(stock_returns)
+    variance = sum((r - mean) ** 2 for r in stock_returns) / len(stock_returns)
+    std = math.sqrt(variance)
+    annualized_vol = std * math.sqrt(252)
+
+    if annualized_vol == 0:
+        return 0.0
+
+    return (annualized_return - risk_free_rate) / annualized_vol
+
+
+def calc_buy_hold_metrics(close_prices, dates):
+    """
+    计算同期买入持有的基准指标
+
+    假设第一天全仓买入、最后一天卖出，计算 Sharpe / 年化收益 / 最大回撤。
+    用于与 DCA 策略做基准对比。
+    """
+    if len(close_prices) < 2:
+        return {'bh_sharpe': 0.0, 'bh_annualized_return': 0.0, 'bh_max_drawdown': 0.0}
+
+    # 年化收益
+    total_return = (close_prices[-1] - close_prices[0]) / close_prices[0]
+    calendar_days = (datetime.strptime(dates[-1], '%Y-%m-%d') -
+                     datetime.strptime(dates[0], '%Y-%m-%d')).days + 1
+    bh_ann_return = calc_annualized_return(total_return, calendar_days)
+
+    # 波动率
+    stock_returns = []
+    for i in range(1, len(close_prices)):
+        if close_prices[i - 1] > 0:
+            stock_returns.append(
+                (close_prices[i] - close_prices[i - 1]) / close_prices[i - 1]
+            )
+
+    mean = sum(stock_returns) / len(stock_returns)
+    variance = sum((r - mean) ** 2 for r in stock_returns) / len(stock_returns)
+    std = math.sqrt(variance)
+    annualized_vol = std * math.sqrt(252)
+
+    bh_sharpe = (bh_ann_return / annualized_vol) if annualized_vol > 0 else 0.0
+
+    # 最大回撤（用收盘价序列）
+    bh_max_dd, _, _ = calc_max_drawdown(close_prices)
+
+    return {
+        'bh_sharpe': bh_sharpe,
+        'bh_annualized_return': bh_ann_return,
+        'bh_max_drawdown': bh_max_dd,
+    }
+
+
 def calc_cost_advantage(avg_cost, period_avg_price):
     """
     成本优势比
@@ -261,6 +340,9 @@ def calc_all_metrics(daily_values, total_cost, total_shares, dates, close_prices
     period_avg_price = sum(close_prices) / len(close_prices) if close_prices else 0
     cost_adv = calc_cost_advantage(avg_cost, period_avg_price)
 
+    benchmark_sharpe = calc_benchmark_sharpe(close_prices, ann_return)
+    bh_metrics = calc_buy_hold_metrics(close_prices, dates)
+
     return {
         'start_date': start_date,
         'end_date': end_date,
@@ -282,4 +364,8 @@ def calc_all_metrics(daily_values, total_cost, total_shares, dates, close_prices
         'avg_cost': avg_cost,
         'period_avg_price': period_avg_price,
         'cost_advantage': cost_adv,
+        'benchmark_sharpe': benchmark_sharpe,
+        'bh_sharpe': bh_metrics['bh_sharpe'],
+        'bh_annualized_return': bh_metrics['bh_annualized_return'],
+        'bh_max_drawdown': bh_metrics['bh_max_drawdown'],
     }
