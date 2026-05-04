@@ -91,6 +91,39 @@ class RSISignalEntry:
         return f"RSISignalEntry(signals={len(self._buy_dates)})"
 
 
+class BreadthEntry:
+    """
+    Market Breadth 驱动入场
+
+    Breadth < threshold 时买入（恐慌区抄底）。
+    构造时传入 Breadth CSV 路径，预计算满足条件的日期集合。
+    """
+
+    def __init__(self, breadth_csv, threshold=20):
+        self.threshold = threshold
+        self._buy_dates = self._load_buy_dates(breadth_csv, threshold)
+
+    @staticmethod
+    def _load_buy_dates(csv_path, threshold):
+        import csv as csv_mod
+        buy_dates = set()
+        with open(csv_path, 'r') as f:
+            reader = csv_mod.DictReader(f)
+            for row in reader:
+                if float(row['breadth']) < threshold:
+                    buy_dates.add(row['date'])
+        return buy_dates
+
+    def should_market_buy(self, context):
+        return context.day['date'] in self._buy_dates
+
+    def should_place_limits(self, context):
+        return False
+
+    def __repr__(self):
+        return f"BreadthEntry(threshold={self.threshold}, signals={len(self._buy_dates)})"
+
+
 class CombinedAndEntry:
     """
     NDayConfirm AND RSI：双重确认

@@ -3,14 +3,16 @@
 使用标准化执行层（市价单买1股、无限价单、不止盈），纯粹比较不同 Entry 模块的择时质量。
 
 用法：
-  python scripts/compare_signals.py              # 比较所有信号策略
-  bash show_chart.sh --env all                   # 可视化查看具体策略
+  python scripts/compare_signals.py                          # 默认：全量比较（使用现有策略列表）
+  python scripts/compare_signals.py --mode nday              # 第一轮：NDay 参数搜索（1-5）
+  python scripts/compare_signals.py --mode full --best-nday 3  # 第二轮：全量比较（指定最优 N）
 
 输出：
   各信号策略在 5 个市场环境下的 Sharpe / 最大回撤 / 年化收益率 对比表格
 """
 import os
 import sys
+import argparse
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -20,7 +22,7 @@ from src.strategies.composable import ComposableStrategy
 from src.modules.tiers import FixedTiers
 from src.modules.entry import (
     UnconditionalEntry, EMAFilterEntry, NDayConfirmEntry, RSISignalEntry,
-    CombinedAndEntry, CombinedOrEntry,
+    CombinedAndEntry, CombinedOrEntry, BreadthEntry,
 )
 from src.modules.position import FixedPyramid
 from src.modules.take_profit import NoTakeProfit
@@ -31,42 +33,59 @@ COMPARE_TIERS = FixedTiers(drops=(0.02, 0.05, 0.10))  # 档位值不影响结果
 COMPARE_POSITION = FixedPyramid(market_shares=1, limit_shares=(0, 0, 0))
 COMPARE_TP = NoTakeProfit()
 
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BREADTH_CSV = os.path.join(ROOT, 'data', 'sp500_breadth.csv')
 
-def build_entries(data):
-    """构建所有待比较的 Entry 候选列表"""
+
+def build_entries_nday():
+    """第一轮：NDay 参数搜索（1-5），不依赖 data"""
+    entries = {}
+    for n in range(1, 6):
+        entries[f'NDayConfirm-{n}'] = {
+            'label': f'连续{n}天低于EMA',
+            'entry': NDayConfirmEntry(n_days=n),
+        }
+    return entries
+
+
+def build_entries_full(data, best_nday):
+    """第二轮：全量比较，使用指定的最优 NDay"""
+    n = best_nday
     return {
-        'Unconditional':  {'label': '无条件每日买入',     'entry': UnconditionalEntry()},
-        'EMAFilter':      {'label': 'EMA 均线过滤',       'entry': EMAFilterEntry()},
-        'NDayConfirm-3':  {'label': '连续3天低于EMA',     'entry': NDayConfirmEntry(n_days=3)},
-        'NDayConfirm-5':  {'label': '连续5天低于EMA(best)', 'entry': NDayConfirmEntry(n_days=5)},
-        'RSISignal':      {'label': 'RSI v2 信号',        'entry': RSISignalEntry(data)},
-        'AND-NDay5+RSI':  {'label': 'NDay5 AND RSI',     'entry': CombinedAndEntry(data, n_days=5)},
-        'OR-NDay5+RSI':   {'label': 'NDay5 OR RSI',      'entry': CombinedOrEntry(data, n_days=5)},
+        'Unconditional':        {'label': '无条件每日买入',           'entry': UnconditionalEntry()},
+        'EMAFilter':            {'label': 'EMA 均线过滤',             'entry': EMAFilterEntry()},
+        f'NDayConfirm-{n}':     {'label': f'连续{n}天低于EMA(best)',  'entry': NDayConfirmEntry(n_days=n)},
+        'RSISignal':            {'label': 'RSI v2 信号',              'entry': RSISignalEntry(data)},
+        f'AND-NDay{n}+RSI':     {'label': f'NDay{n} AND RSI',        'entry': CombinedAndEntry(data, n_days=n)},
+        f'OR-NDay{n}+RSI':      {'label': f'NDay{n} OR RSI',         'entry': CombinedOrEntry(data, n_days=n)},
+        'Breadth<20':           {'label': 'Breadth<20 恐慌买入',      'entry': BreadthEntry(BREADTH_CSV)},
     }
 
 
-def run_comparison():
-    """运行所有信号策略在所有环境下的回测比较"""
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    data_path = os.path.join(root, DATA_FILE)
-    smh_path = os.path.join(root, SMH_FILE)
+def build_entries_legacy(data):
+    """兼容旧版：使用硬编码 NDay=5 的策略列表"""
+    return build_entries_full(data, best_nday=5)
 
-    # 排除 'all' 环境的权重为0，但仍然跑（用于观察，不参与加权）
+
+def run_comparison(entries_builder, title, needs_data=True):
+    """运行信号策略在所有环境下的回测比较"""
+    data_path = os.path.join(ROOT, DATA_FILE)
+    smh_path = os.path.join(ROOT, SMH_FILE)
+
     envs_for_score = {k: v for k, v in MARKET_ENVS.items() if v['weight'] > 0}
 
-    results = {}  # {entry_id: {env_id: metrics}}
+    results = {}
 
     print('=' * 72)
-    print('  信号策略比较（标准化执行：市价买1股、无限价单、不止盈）')
+    print(f'  {title}')
+    print('  标准化执行：市价买1股、无限价单、不止盈')
     print('=' * 72)
 
-    # 为每个环境加载数据并运行
     for env_id, env_config in MARKET_ENVS.items():
         data = load_data(data_path, env_config['start'], env_config['end'])
         smh_data = load_data(smh_path, env_config['start'], env_config['end'])
 
-        # RSISignalEntry 需要 data，每个环境要重新构建
-        entries = build_entries(data)
+        entries = entries_builder(data) if needs_data else entries_builder()
 
         print(f"\n{'─' * 72}")
         print(f"  环境: {env_config['label']} ({env_config['start']} ~ {env_config['end']})")
@@ -99,7 +118,6 @@ def run_comparison():
             print(f"  {config['label']:<22} {ann_ret:>+9.2f}% {max_dd:>9.1f}% {sharpe:>8.2f} {bm_sharpe:>10.2f} {cost_adv:>+7.2f}% {buy_count:>8}")
 
         # 输出买入持有基准
-        last_entry = list(entries.values())[-1]
         bh_ret = metrics.get('bh_annualized_return', 0) * 100
         bh_sharpe = metrics.get('bh_sharpe', 0)
         bh_dd = metrics.get('bh_max_drawdown', 0) * 100
@@ -127,25 +145,14 @@ def run_comparison():
 
     scores.sort(key=lambda x: x[2], reverse=True)
 
-    print(f"\n  {'排名':<4} {'策略':<22} {'加权Sharpe':>12} {'备注'}")
-    print(f"  {'-'*4} {'-'*22} {'-'*12} {'-'*20}")
+    print(f"\n  {'排名':<4} {'策略':<22} {'加权Sharpe':>12}")
+    print(f"  {'-'*4} {'-'*22} {'-'*12}")
 
     for rank, (entry_id, label, score) in enumerate(scores, 1):
-        note = '← Baseline' if entry_id == 'NDayConfirm-5' else ''
         marker = ' ★' if rank == 1 else ''
-        print(f"  {rank:<4} {label:<22} {score:>12.4f} {note}{marker}")
+        print(f"  {rank:<4} {label:<22} {score:>12.4f}{marker}")
 
     print(f"\n{'=' * 72}")
-    winner = scores[0]
-    baseline = next((s for s in scores if s[0] == 'NDayConfirm-5'), None)
-
-    if winner[0] == 'NDayConfirm-5':
-        print(f"  结论：当前 Baseline (NDayConfirm-5) 仍为最优")
-    elif baseline:
-        diff = winner[2] - baseline[2]
-        print(f"  结论：{winner[1]} (Sharpe {winner[2]:.4f}) beat Baseline (Sharpe {baseline[2]:.4f})")
-        print(f"         提升 {diff:+.4f}，建议升级为新 Baseline")
-    print(f"{'=' * 72}")
 
     # 输出最优策略在各环境的全量指标
     best_id = scores[0][0]
@@ -175,5 +182,35 @@ def run_comparison():
         print(f"    买入持有回撤:   {m.get('bh_max_drawdown', 0)*100:.1f}%")
 
 
+def main():
+    parser = argparse.ArgumentParser(description='信号策略比较')
+    parser.add_argument('--mode', type=str, default='default',
+                        choices=['default', 'nday', 'full'],
+                        help='运行模式：default=兼容旧版, nday=NDay参数搜索, full=全量比较')
+    parser.add_argument('--best-nday', type=int, default=5,
+                        help='全量比较时使用的最优 NDay 参数（默认 5）')
+    args = parser.parse_args()
+
+    if args.mode == 'nday':
+        run_comparison(
+            entries_builder=build_entries_nday,
+            title='NDay 参数搜索（NDayConfirm 1-5）',
+            needs_data=False,
+        )
+    elif args.mode == 'full':
+        n = args.best_nday
+        run_comparison(
+            entries_builder=lambda data: build_entries_full(data, best_nday=n),
+            title=f'全量信号比较（最优 NDay={n}）',
+            needs_data=True,
+        )
+    else:
+        run_comparison(
+            entries_builder=build_entries_legacy,
+            title='信号策略比较',
+            needs_data=True,
+        )
+
+
 if __name__ == '__main__':
-    run_comparison()
+    main()
