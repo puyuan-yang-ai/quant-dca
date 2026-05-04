@@ -29,6 +29,9 @@ Thumbs.db
 # Jupyter
 .ipynb_checkpoints/
 
+# Worktrees
+.worktrees/
+
 # Output (generated charts, can be regenerated)
 output/*.png
 output/*.html
