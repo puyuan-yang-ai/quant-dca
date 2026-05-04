@@ -15,16 +15,17 @@ _HTML_FILENAME = 'interactive.html'
 
 
 def show_interactive_chart(data, metrics, title='SOXL DCA 回测',
-                           output_dir='output', port=9870):
+                           output_dir='output', port=9870, breadth_data=None):
     """
     生成交互式 K 线图并启动 HTTP 服务
 
     Args:
-        data: SOXL K 线数据列表 [{'date', 'open', 'high', 'low', 'close'}, ...]
+        data: K 线数据列表 [{'date', 'open', 'high', 'low', 'close'}, ...]
         metrics: BacktestEngine.run() 返回的结果字典
         title: 图表标题
         output_dir: HTML 文件保存目录
         port: HTTP 服务端口
+        breadth_data: Market Breadth 数据列表 [{'time': 'YYYY-MM-DD', 'value': float}, ...]
     """
     # 构建 K 线数据
     candles = [
@@ -123,7 +124,8 @@ def show_interactive_chart(data, metrics, title='SOXL DCA 回测',
     }
 
     html = _build_html(title, candles, ema_data, markers, summary,
-                       rsi_data, fast_ma_data, rsi_markers)
+                       rsi_data, fast_ma_data, rsi_markers,
+                       breadth_data=breadth_data)
 
     os.makedirs(output_dir, exist_ok=True)
     filepath = os.path.join(output_dir, _HTML_FILENAME)
@@ -193,17 +195,34 @@ def _get_hostname():
 
 
 def _build_html(title, candles, ema_data, markers, summary,
-                rsi_data=None, fast_ma_data=None, rsi_markers=None):
+                rsi_data=None, fast_ma_data=None, rsi_markers=None,
+                breadth_data=None):
     """生成自包含的 HTML 文件内容"""
 
     has_rsi = rsi_data and len(rsi_data) > 0
+    has_breadth = breadth_data and len(breadth_data) > 0
 
-    # 主图高度根据是否有 RSI 副图调整
-    main_height = 'calc(70vh - 48px)' if has_rsi else 'calc(100vh - 48px)'
-    rsi_height = 'calc(30vh)' if has_rsi else '0'
+    # 高度分配：根据面板数量动态调整
+    if has_rsi and has_breadth:
+        main_height = 'calc(50vh - 48px)'
+        rsi_height = 'calc(25vh)'
+        breadth_height = 'calc(25vh)'
+    elif has_rsi:
+        main_height = 'calc(70vh - 48px)'
+        rsi_height = 'calc(30vh)'
+        breadth_height = '0'
+    elif has_breadth:
+        main_height = 'calc(70vh - 48px)'
+        rsi_height = '0'
+        breadth_height = 'calc(30vh)'
+    else:
+        main_height = 'calc(100vh - 48px)'
+        rsi_height = '0'
+        breadth_height = '0'
 
-    # RSI 副图的 HTML 和 JS
+    # 副图的 HTML
     rsi_div_html = '<div id="rsi-chart"></div>' if has_rsi else ''
+    breadth_div_html = '<div id="breadth-chart"></div>' if has_breadth else ''
 
     rsi_js = ''
     if has_rsi:
@@ -251,35 +270,28 @@ if (rsiMarkers.length > 0) {{
   rsiSeries.setMarkers(rsiMarkers);
 }}
 
-// 同步主图和 RSI 副图的时间轴（使用 TimeRange 而非 LogicalRange，
-// 因为两图数据点数量不同——RSI 前 14 根为 None 被跳过，
-// 用 LogicalRange 会导致偏移）
-let isSyncing = false;
-chart.timeScale().subscribeVisibleTimeRangeChange(range => {{
-  if (range && !isSyncing) {{
-    isSyncing = true;
-    rsiChart.timeScale().setVisibleRange(range);
-    isSyncing = false;
-  }}
-}});
-rsiChart.timeScale().subscribeVisibleTimeRangeChange(range => {{
-  if (range && !isSyncing) {{
-    isSyncing = true;
-    chart.timeScale().setVisibleRange(range);
-    isSyncing = false;
-  }}
-}});
+// 多图同步（时间轴 + 十字光标），支持 2~3 个图表
+const allCharts = [{{ chart: chart, series: candleSeries }}];
+allCharts.push({{ chart: rsiChart, series: rsiSeries }});
 
-// 同步十字光标
-chart.subscribeCrosshairMove(param => {{
-  if (param.time) {{
-    rsiChart.setCrosshairPosition(undefined, param.time, rsiSeries);
-  }}
-}});
-rsiChart.subscribeCrosshairMove(param => {{
-  if (param.time) {{
-    chart.setCrosshairPosition(undefined, param.time, candleSeries);
-  }}
+let isSyncing = false;
+function syncTimeRange(source, range) {{
+  if (!range || isSyncing) return;
+  isSyncing = true;
+  allCharts.forEach(c => {{
+    if (c.chart !== source) c.chart.timeScale().setVisibleRange(range);
+  }});
+  isSyncing = false;
+}}
+function syncCrosshair(source, param) {{
+  if (!param.time) return;
+  allCharts.forEach(c => {{
+    if (c.chart !== source) c.chart.setCrosshairPosition(undefined, param.time, c.series);
+  }});
+}}
+allCharts.forEach(c => {{
+  c.chart.timeScale().subscribeVisibleTimeRangeChange(r => syncTimeRange(c.chart, r));
+  c.chart.subscribeCrosshairMove(p => syncCrosshair(c.chart, p));
 }});
 
 rsiChart.timeScale().fitContent();
@@ -289,6 +301,95 @@ window.addEventListener('resize', () => {{
   rsiChart.applyOptions({{
     width: document.getElementById('rsi-chart').clientWidth,
     height: document.getElementById('rsi-chart').clientHeight,
+  }});
+}});
+'''
+
+    breadth_js = ''
+    if has_breadth:
+        breadth_js = f'''
+// ═══════════════════════════════════════════════════
+//  Market Breadth 副图
+// ═══════════════════════════════════════════════════
+
+const breadthChart = LightweightCharts.createChart(document.getElementById('breadth-chart'), {{
+  layout: {{ background: {{ color: initTheme.bg }}, textColor: initTheme.text }},
+  grid: {{
+    vertLines: {{ color: initTheme.grid }},
+    horzLines: {{ color: initTheme.grid }},
+  }},
+  crosshair: {{ mode: LightweightCharts.CrosshairMode.Normal }},
+  timeScale: {{ timeVisible: false, borderColor: initTheme.border }},
+  rightPriceScale: {{ borderColor: initTheme.border, scaleMargins: {{ top: 0.05, bottom: 0.05 }} }},
+}});
+
+// Breadth 曲线
+const breadthSeries = breadthChart.addLineSeries({{
+  color: '#2196F3', lineWidth: 2, priceLineVisible: false, lastValueVisible: true,
+  title: 'Breadth',
+}});
+const breadthData = {json.dumps(breadth_data)};
+breadthSeries.setData(breadthData);
+
+// 填充区域：用 Baseline Series 实现 Breadth 曲线本身的上下填色
+// 当 Breadth > 80 时显示绿色填充，< 20 时显示红色填充
+const breadthFill = breadthChart.addBaselineSeries({{
+  baseValue: {{ type: 'price', price: 50 }},
+  topLineColor: 'transparent',
+  topFillColor1: 'rgba(38, 166, 154, 0.15)',
+  topFillColor2: 'transparent',
+  bottomLineColor: 'transparent',
+  bottomFillColor1: 'transparent',
+  bottomFillColor2: 'rgba(239, 83, 80, 0.15)',
+  lineWidth: 0,
+  priceLineVisible: false,
+  lastValueVisible: false,
+  crosshairMarkerVisible: false,
+}});
+breadthFill.setData(breadthData);
+
+// 参考线：20（红）、50（灰）、80（绿）
+breadthSeries.createPriceLine({{ price: 80, color: '#26a69a', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '' }});
+breadthSeries.createPriceLine({{ price: 50, color: '#787B86', lineWidth: 1, lineStyle: 1, axisLabelVisible: false, title: '' }});
+breadthSeries.createPriceLine({{ price: 20, color: '#ef5350', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '' }});
+
+// 将 Breadth 图加入同步数组（如果存在）
+if (typeof allCharts !== 'undefined') {{
+  allCharts.push({{ chart: breadthChart, series: breadthSeries }});
+  breadthChart.timeScale().subscribeVisibleTimeRangeChange(r => syncTimeRange(breadthChart, r));
+  breadthChart.subscribeCrosshairMove(p => syncCrosshair(breadthChart, p));
+}} else {{
+  // 没有 RSI 图时，直接与主图同步
+  let isSyncing = false;
+  chart.timeScale().subscribeVisibleTimeRangeChange(range => {{
+    if (range && !isSyncing) {{
+      isSyncing = true;
+      breadthChart.timeScale().setVisibleRange(range);
+      isSyncing = false;
+    }}
+  }});
+  breadthChart.timeScale().subscribeVisibleTimeRangeChange(range => {{
+    if (range && !isSyncing) {{
+      isSyncing = true;
+      chart.timeScale().setVisibleRange(range);
+      isSyncing = false;
+    }}
+  }});
+  chart.subscribeCrosshairMove(param => {{
+    if (param.time) breadthChart.setCrosshairPosition(undefined, param.time, breadthSeries);
+  }});
+  breadthChart.subscribeCrosshairMove(param => {{
+    if (param.time) chart.setCrosshairPosition(undefined, param.time, candleSeries);
+  }});
+}}
+
+breadthChart.timeScale().fitContent();
+
+// 窗口缩放时调整 Breadth 图
+window.addEventListener('resize', () => {{
+  breadthChart.applyOptions({{
+    width: document.getElementById('breadth-chart').clientWidth,
+    height: document.getElementById('breadth-chart').clientHeight,
   }});
 }});
 '''
@@ -327,6 +428,9 @@ window.addEventListener('resize', () => {{
   #rsi-chart {{ width: 100%; height: {rsi_height}; }}
   body.dark #rsi-chart {{ border-top: 1px solid #2a2e39; }}
   body.light #rsi-chart {{ border-top: 1px solid #d6dcde; }}
+  #breadth-chart {{ width: 100%; height: {breadth_height}; }}
+  body.dark #breadth-chart {{ border-top: 1px solid #2a2e39; }}
+  body.light #breadth-chart {{ border-top: 1px solid #d6dcde; }}
 </style>
 </head>
 <body class="dark">
@@ -340,6 +444,7 @@ window.addEventListener('resize', () => {{
 </div>
 <div id="chart"></div>
 {rsi_div_html}
+{breadth_div_html}
 
 <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
 <script>
@@ -372,6 +477,7 @@ function applyTheme(theme) {{
   }};
   chart.applyOptions(chartOpts);
   if (typeof rsiChart !== 'undefined') rsiChart.applyOptions(chartOpts);
+  if (typeof breadthChart !== 'undefined') breadthChart.applyOptions(chartOpts);
   localStorage.setItem('chartTheme', theme);
 }}
 
@@ -430,6 +536,8 @@ window.addEventListener('resize', () => {{
 }});
 
 {rsi_js}
+
+{breadth_js}
 
 // 应用保存的主题偏好
 if (currentTheme === 'light') applyTheme('light');

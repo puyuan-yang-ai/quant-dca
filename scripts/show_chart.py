@@ -13,11 +13,15 @@ from src.data_loader import load_data
 from src.backtest_engine import BacktestEngine
 from src.strategies.composable import ComposableStrategy
 from src.interactive_chart import show_interactive_chart
+import csv
+
 from experiments.configs import (
     MARKET_ENVS, DATA_FILE, SMH_FILE, FEE_RATE,
     DEFAULT_TIERS, DEFAULT_ENTRY, DEFAULT_POSITION, DEFAULT_TP,
     BEST_TIERS, BEST_ENTRY, BEST_POSITION, BEST_TP,
 )
+
+BREADTH_FILE = 'data/sp500_breadth.csv'
 
 STRATEGIES = {
     'best': {
@@ -35,6 +39,28 @@ STRATEGIES = {
         'take_profit': DEFAULT_TP,
     },
 }
+
+
+def load_breadth(filepath, start_date, end_date):
+    """加载 Market Breadth CSV 数据，按日期范围过滤"""
+    if not os.path.exists(filepath):
+        print(f"提示：未找到 Breadth 数据文件 {filepath}，跳过 Breadth 副图")
+        print(f"  运行 python scripts/fetch_breadth.py 生成数据")
+        return None
+
+    breadth_data = []
+    with open(filepath, 'r') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if start_date <= row['date'] <= end_date:
+                breadth_data.append({
+                    'time': row['date'],
+                    'value': round(float(row['breadth']), 2),
+                })
+
+    if breadth_data:
+        print(f"Breadth 数据：{len(breadth_data)} 个交易日")
+    return breadth_data if breadth_data else None
 
 
 def main():
@@ -59,6 +85,9 @@ def main():
     data = load_data(os.path.join(root, DATA_FILE), env['start'], env['end'])
     smh_data = load_data(os.path.join(root, SMH_FILE), env['start'], env['end'])
 
+    # 加载 Breadth 数据
+    breadth_data = load_breadth(os.path.join(root, BREADTH_FILE), env['start'], env['end'])
+
     strategy = ComposableStrategy(
         tiers=strat_config['tiers'],
         entry=strat_config['entry'],
@@ -76,7 +105,8 @@ def main():
     print(f"交易记录：{len(metrics.get('trade_log', []))} 笔")
 
     title = f"SPY DCA [{strat_config['label']}] — {env['label']}（{env['start']} ~ {env['end']}）"
-    show_interactive_chart(data, metrics, title=title, port=args.port)
+    show_interactive_chart(data, metrics, title=title, port=args.port,
+                           breadth_data=breadth_data)
 
 
 if __name__ == '__main__':
