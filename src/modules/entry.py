@@ -124,6 +124,73 @@ class BreadthEntry:
         return f"BreadthEntry(threshold={self.threshold}, signals={len(self._buy_dates)})"
 
 
+class VIXEntry:
+    """
+    VIX 恐慌驱动入场
+
+    VIX > threshold 时买入（市场恐慌区）。
+    构造时传入 VIX CSV 路径，预计算满足条件的日期集合。
+    """
+
+    def __init__(self, vix_csv, threshold=30):
+        self.threshold = threshold
+        self._buy_dates = self._load_buy_dates(vix_csv, threshold)
+
+    @staticmethod
+    def _load_buy_dates(csv_path, threshold):
+        import csv as csv_mod
+        buy_dates = set()
+        with open(csv_path, 'r') as f:
+            reader = csv_mod.DictReader(f)
+            for row in reader:
+                if float(row['close']) > threshold:
+                    buy_dates.add(row['date'])
+        return buy_dates
+
+    def should_market_buy(self, context):
+        return context.day['date'] in self._buy_dates
+
+    def should_place_limits(self, context):
+        return False
+
+    def __repr__(self):
+        return f"VIXEntry(threshold={self.threshold}, signals={len(self._buy_dates)})"
+
+
+class SafeHavenEntry:
+    """
+    避险需求驱动入场
+
+    Safe Haven（TLT 20日收益 - SPY 20日收益）> threshold 时买入。
+    正值表示资金流向国债（避险），此时股票可能被低估。
+    构造时传入 Safe Haven CSV 路径，预计算满足条件的日期集合。
+    """
+
+    def __init__(self, sh_csv, threshold=0.05):
+        self.threshold = threshold
+        self._buy_dates = self._load_buy_dates(sh_csv, threshold)
+
+    @staticmethod
+    def _load_buy_dates(csv_path, threshold):
+        import csv as csv_mod
+        buy_dates = set()
+        with open(csv_path, 'r') as f:
+            reader = csv_mod.DictReader(f)
+            for row in reader:
+                if float(row['safe_haven']) > threshold:
+                    buy_dates.add(row['date'])
+        return buy_dates
+
+    def should_market_buy(self, context):
+        return context.day['date'] in self._buy_dates
+
+    def should_place_limits(self, context):
+        return False
+
+    def __repr__(self):
+        return f"SafeHavenEntry(threshold={self.threshold}, signals={len(self._buy_dates)})"
+
+
 class CombinedAndEntry:
     """
     NDayConfirm AND RSI：双重确认

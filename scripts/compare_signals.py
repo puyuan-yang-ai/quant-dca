@@ -23,6 +23,7 @@ from src.modules.tiers import FixedTiers
 from src.modules.entry import (
     UnconditionalEntry, EMAFilterEntry, NDayConfirmEntry, RSISignalEntry,
     CombinedAndEntry, CombinedOrEntry, BreadthEntry,
+    VIXEntry, SafeHavenEntry,
 )
 from src.modules.position import FixedPyramid
 from src.modules.take_profit import NoTakeProfit
@@ -35,6 +36,8 @@ COMPARE_TP = NoTakeProfit()
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BREADTH_CSV = os.path.join(ROOT, 'data', 'sp500_breadth.csv')
+VIX_CSV = os.path.join(ROOT, 'data', 'vix_daily.csv')
+SH_CSV = os.path.join(ROOT, 'data', 'safe_haven.csv')
 
 
 def build_entries_nday():
@@ -48,8 +51,30 @@ def build_entries_nday():
     return entries
 
 
-def build_entries_full(data, best_nday):
-    """第二轮：全量比较，使用指定的最优 NDay"""
+def build_entries_vix():
+    """VIX 阈值参数搜索"""
+    entries = {}
+    for t in [30, 35, 40, 45, 50]:
+        entries[f'VIX>{t}'] = {
+            'label': f'VIX>{t}',
+            'entry': VIXEntry(VIX_CSV, threshold=t),
+        }
+    return entries
+
+
+def build_entries_safehaven():
+    """Safe Haven 阈值参数搜索"""
+    entries = {}
+    for t in [0.02, 0.05, 0.08, 0.10]:
+        entries[f'SH>{t}'] = {
+            'label': f'SafeHaven>{t}',
+            'entry': SafeHavenEntry(SH_CSV, threshold=t),
+        }
+    return entries
+
+
+def build_entries_full(data, best_nday, best_vix=30, best_sh=0.05):
+    """第二轮：全量比较，使用指定的最优参数"""
     n = best_nday
     return {
         'Unconditional':        {'label': '无条件每日买入',           'entry': UnconditionalEntry()},
@@ -59,12 +84,14 @@ def build_entries_full(data, best_nday):
         f'AND-NDay{n}+RSI':     {'label': f'NDay{n} AND RSI',        'entry': CombinedAndEntry(data, n_days=n)},
         f'OR-NDay{n}+RSI':      {'label': f'NDay{n} OR RSI',         'entry': CombinedOrEntry(data, n_days=n)},
         'Breadth<20':           {'label': 'Breadth<20 恐慌买入',      'entry': BreadthEntry(BREADTH_CSV)},
+        f'VIX>{best_vix}':      {'label': f'VIX>{best_vix} 恐慌买入', 'entry': VIXEntry(VIX_CSV, threshold=best_vix)},
+        f'SH>{best_sh}':        {'label': f'SafeHaven>{best_sh}',    'entry': SafeHavenEntry(SH_CSV, threshold=best_sh)},
     }
 
 
 def build_entries_legacy(data):
-    """兼容旧版：使用硬编码 NDay=5 的策略列表"""
-    return build_entries_full(data, best_nday=5)
+    """兼容旧版：使用硬编码默认参数的策略列表"""
+    return build_entries_full(data, best_nday=5, best_vix=30, best_sh=0.05)
 
 
 def run_comparison(entries_builder, title, needs_data=True):
@@ -185,10 +212,15 @@ def run_comparison(entries_builder, title, needs_data=True):
 def main():
     parser = argparse.ArgumentParser(description='信号策略比较')
     parser.add_argument('--mode', type=str, default='default',
-                        choices=['default', 'nday', 'full'],
-                        help='运行模式：default=兼容旧版, nday=NDay参数搜索, full=全量比较')
+                        choices=['default', 'nday', 'vix', 'safehaven', 'full'],
+                        help='运行模式：default=兼容旧版, nday=NDay参数搜索, '
+                             'vix=VIX参数搜索, safehaven=SafeHaven参数搜索, full=全量比较')
     parser.add_argument('--best-nday', type=int, default=5,
                         help='全量比较时使用的最优 NDay 参数（默认 5）')
+    parser.add_argument('--best-vix', type=int, default=30,
+                        help='全量比较时使用的最优 VIX 阈值（默认 30）')
+    parser.add_argument('--best-sh', type=float, default=0.05,
+                        help='全量比较时使用的最优 SafeHaven 阈值（默认 0.05）')
     args = parser.parse_args()
 
     if args.mode == 'nday':
@@ -197,11 +229,25 @@ def main():
             title='NDay 参数搜索（NDayConfirm 1-5）',
             needs_data=False,
         )
+    elif args.mode == 'vix':
+        run_comparison(
+            entries_builder=build_entries_vix,
+            title='VIX 阈值参数搜索（30/35/40/45/50）',
+            needs_data=False,
+        )
+    elif args.mode == 'safehaven':
+        run_comparison(
+            entries_builder=build_entries_safehaven,
+            title='Safe Haven 阈值参数搜索（0.02/0.05/0.08/0.10）',
+            needs_data=False,
+        )
     elif args.mode == 'full':
         n = args.best_nday
+        v = args.best_vix
+        s = args.best_sh
         run_comparison(
-            entries_builder=lambda data: build_entries_full(data, best_nday=n),
-            title=f'全量信号比较（最优 NDay={n}）',
+            entries_builder=lambda data: build_entries_full(data, best_nday=n, best_vix=v, best_sh=s),
+            title=f'全量信号比较（NDay={n}, VIX={v}, SH={s}）',
             needs_data=True,
         )
     else:

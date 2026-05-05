@@ -15,7 +15,8 @@ _HTML_FILENAME = 'interactive.html'
 
 
 def show_interactive_chart(data, metrics, title='SOXL DCA 回测',
-                           output_dir='output', port=9870, breadth_data=None):
+                           output_dir='output', port=9870, breadth_data=None,
+                           vix_data=None):
     """
     生成交互式 K 线图并启动 HTTP 服务
 
@@ -125,7 +126,7 @@ def show_interactive_chart(data, metrics, title='SOXL DCA 回测',
 
     html = _build_html(title, candles, ema_data, markers, summary,
                        rsi_data, fast_ma_data, rsi_markers,
-                       breadth_data=breadth_data)
+                       breadth_data=breadth_data, vix_data=vix_data)
 
     os.makedirs(output_dir, exist_ok=True)
     filepath = os.path.join(output_dir, _HTML_FILENAME)
@@ -196,33 +197,40 @@ def _get_hostname():
 
 def _build_html(title, candles, ema_data, markers, summary,
                 rsi_data=None, fast_ma_data=None, rsi_markers=None,
-                breadth_data=None):
+                breadth_data=None, vix_data=None):
     """生成自包含的 HTML 文件内容"""
 
     has_rsi = rsi_data and len(rsi_data) > 0
     has_breadth = breadth_data and len(breadth_data) > 0
+    has_vix = vix_data and len(vix_data) > 0
 
     # 高度分配：根据面板数量动态调整
-    if has_rsi and has_breadth:
+    sub_count = sum([has_rsi, has_breadth, has_vix])
+    if sub_count >= 3:
+        main_height = 'calc(40vh - 48px)'
+        rsi_height = 'calc(20vh)' if has_rsi else '0'
+        breadth_height = 'calc(20vh)' if has_breadth else '0'
+        vix_height = 'calc(20vh)' if has_vix else '0'
+    elif sub_count == 2:
         main_height = 'calc(50vh - 48px)'
-        rsi_height = 'calc(25vh)'
-        breadth_height = 'calc(25vh)'
-    elif has_rsi:
+        rsi_height = 'calc(25vh)' if has_rsi else '0'
+        breadth_height = 'calc(25vh)' if has_breadth else '0'
+        vix_height = 'calc(25vh)' if has_vix else '0'
+    elif sub_count == 1:
         main_height = 'calc(70vh - 48px)'
-        rsi_height = 'calc(30vh)'
-        breadth_height = '0'
-    elif has_breadth:
-        main_height = 'calc(70vh - 48px)'
-        rsi_height = '0'
-        breadth_height = 'calc(30vh)'
+        rsi_height = 'calc(30vh)' if has_rsi else '0'
+        breadth_height = 'calc(30vh)' if has_breadth else '0'
+        vix_height = 'calc(30vh)' if has_vix else '0'
     else:
         main_height = 'calc(100vh - 48px)'
         rsi_height = '0'
         breadth_height = '0'
+        vix_height = '0'
 
     # 副图的 HTML
     rsi_div_html = '<div id="rsi-chart"></div>' if has_rsi else ''
     breadth_div_html = '<div id="breadth-chart"></div>' if has_breadth else ''
+    vix_div_html = '<div id="vix-chart"></div>' if has_vix else ''
 
     rsi_js = ''
     if has_rsi:
@@ -394,6 +402,93 @@ window.addEventListener('resize', () => {{
 }});
 '''
 
+    vix_js = ''
+    if has_vix:
+        vix_js = f'''
+// ═══════════════════════════════════════════════════
+//  VIX 副图
+// ═══════════════════════════════════════════════════
+
+const vixChart = LightweightCharts.createChart(document.getElementById('vix-chart'), {{
+  layout: {{ background: {{ color: initTheme.bg }}, textColor: initTheme.text }},
+  grid: {{
+    vertLines: {{ color: initTheme.grid }},
+    horzLines: {{ color: initTheme.grid }},
+  }},
+  crosshair: {{ mode: LightweightCharts.CrosshairMode.Normal }},
+  timeScale: {{ timeVisible: false, borderColor: initTheme.border }},
+  rightPriceScale: {{ borderColor: initTheme.border, scaleMargins: {{ top: 0.05, bottom: 0.05 }} }},
+}});
+
+// VIX 曲线（蓝色）
+const vixSeries = vixChart.addLineSeries({{
+  color: '#2196F3', lineWidth: 2, priceLineVisible: false, lastValueVisible: true,
+  title: 'VIX',
+}});
+const vixData = {json.dumps(vix_data)};
+vixSeries.setData(vixData);
+
+// 恐慌区域填充（> 30 红色半透明）
+const vixFill = vixChart.addBaselineSeries({{
+  baseValue: {{ type: 'price', price: 30 }},
+  topLineColor: 'transparent',
+  topFillColor1: 'rgba(239, 83, 80, 0.25)',
+  topFillColor2: 'rgba(239, 83, 80, 0.05)',
+  bottomLineColor: 'transparent',
+  bottomFillColor1: 'transparent',
+  bottomFillColor2: 'transparent',
+  lineWidth: 0,
+  priceLineVisible: false,
+  lastValueVisible: false,
+  crosshairMarkerVisible: false,
+}});
+vixFill.setData(vixData);
+
+// 参考线：20（黄色虚线）、30（红色虚线）
+vixSeries.createPriceLine({{ price: 20, color: '#FF9800', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '' }});
+vixSeries.createPriceLine({{ price: 30, color: '#ef5350', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '' }});
+
+// 将 VIX 图加入同步数组（如果存在）
+if (typeof allCharts !== 'undefined') {{
+  allCharts.push({{ chart: vixChart, series: vixSeries }});
+  vixChart.timeScale().subscribeVisibleTimeRangeChange(r => syncTimeRange(vixChart, r));
+  vixChart.subscribeCrosshairMove(p => syncCrosshair(vixChart, p));
+}} else {{
+  // 没有 RSI/Breadth 图时，直接与主图同步
+  let isSyncing = false;
+  chart.timeScale().subscribeVisibleTimeRangeChange(range => {{
+    if (range && !isSyncing) {{
+      isSyncing = true;
+      vixChart.timeScale().setVisibleRange(range);
+      isSyncing = false;
+    }}
+  }});
+  vixChart.timeScale().subscribeVisibleTimeRangeChange(range => {{
+    if (range && !isSyncing) {{
+      isSyncing = true;
+      chart.timeScale().setVisibleRange(range);
+      isSyncing = false;
+    }}
+  }});
+  chart.subscribeCrosshairMove(param => {{
+    if (param.time) vixChart.setCrosshairPosition(undefined, param.time, vixSeries);
+  }});
+  vixChart.subscribeCrosshairMove(param => {{
+    if (param.time) chart.setCrosshairPosition(undefined, param.time, candleSeries);
+  }});
+}}
+
+vixChart.timeScale().fitContent();
+
+// 窗口缩放时调整 VIX 图
+window.addEventListener('resize', () => {{
+  vixChart.applyOptions({{
+    width: document.getElementById('vix-chart').clientWidth,
+    height: document.getElementById('vix-chart').clientHeight,
+  }});
+}});
+'''
+
     return f'''<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -431,6 +526,9 @@ window.addEventListener('resize', () => {{
   #breadth-chart {{ width: 100%; height: {breadth_height}; }}
   body.dark #breadth-chart {{ border-top: 1px solid #2a2e39; }}
   body.light #breadth-chart {{ border-top: 1px solid #d6dcde; }}
+  #vix-chart {{ width: 100%; height: {vix_height}; }}
+  body.dark #vix-chart {{ border-top: 1px solid #2a2e39; }}
+  body.light #vix-chart {{ border-top: 1px solid #d6dcde; }}
 </style>
 </head>
 <body class="dark">
@@ -445,6 +543,7 @@ window.addEventListener('resize', () => {{
 <div id="chart"></div>
 {rsi_div_html}
 {breadth_div_html}
+{vix_div_html}
 
 <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
 <script>
@@ -478,6 +577,7 @@ function applyTheme(theme) {{
   chart.applyOptions(chartOpts);
   if (typeof rsiChart !== 'undefined') rsiChart.applyOptions(chartOpts);
   if (typeof breadthChart !== 'undefined') breadthChart.applyOptions(chartOpts);
+  if (typeof vixChart !== 'undefined') vixChart.applyOptions(chartOpts);
   localStorage.setItem('chartTheme', theme);
 }}
 
@@ -538,6 +638,8 @@ window.addEventListener('resize', () => {{
 {rsi_js}
 
 {breadth_js}
+
+{vix_js}
 
 // 应用保存的主题偏好
 if (currentTheme === 'light') applyTheme('light');

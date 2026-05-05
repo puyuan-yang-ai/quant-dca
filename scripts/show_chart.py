@@ -22,6 +22,7 @@ from experiments.configs import (
 )
 
 BREADTH_FILE = 'data/sp500_breadth.csv'
+VIX_FILE = 'data/vix_daily.csv'
 
 STRATEGIES = {
     'best': {
@@ -63,6 +64,28 @@ def load_breadth(filepath, start_date, end_date):
     return breadth_data if breadth_data else None
 
 
+def load_vix(filepath, start_date, end_date):
+    """加载 VIX 日线 CSV 数据，按日期范围过滤"""
+    if not os.path.exists(filepath):
+        print(f"提示：未找到 VIX 数据文件 {filepath}，跳过 VIX 副图")
+        print(f"  运行 python scripts/fetch_sentiment.py 生成数据")
+        return None
+
+    vix_data = []
+    with open(filepath, 'r') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if start_date <= row['date'] <= end_date:
+                vix_data.append({
+                    'time': row['date'],
+                    'value': round(float(row['close']), 2),
+                })
+
+    if vix_data:
+        print(f"VIX 数据：{len(vix_data)} 个交易日")
+    return vix_data if vix_data else None
+
+
 def main():
     parser = argparse.ArgumentParser(description='交互式策略图表查看')
     parser.add_argument('--env', type=str, default='bear-bull',
@@ -88,6 +111,9 @@ def main():
     # 加载 Breadth 数据
     breadth_data = load_breadth(os.path.join(root, BREADTH_FILE), env['start'], env['end'])
 
+    # 加载 VIX 数据
+    vix_data = load_vix(os.path.join(root, VIX_FILE), env['start'], env['end'])
+
     strategy = ComposableStrategy(
         tiers=strat_config['tiers'],
         entry=strat_config['entry'],
@@ -106,7 +132,7 @@ def main():
 
     title = f"SPY DCA [{strat_config['label']}] — {env['label']}（{env['start']} ~ {env['end']}）"
     show_interactive_chart(data, metrics, title=title, port=args.port,
-                           breadth_data=breadth_data)
+                           breadth_data=breadth_data, vix_data=vix_data)
 
 
 if __name__ == '__main__':
