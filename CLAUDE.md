@@ -41,6 +41,7 @@ python scripts/compare_signals.py                            # 默认：兼容�
 python scripts/compare_signals.py --mode nday                # NDay 参数搜索（1-5）
 python scripts/compare_signals.py --mode vix                 # VIX 阈值搜索（30/35/40/45/50）
 python scripts/compare_signals.py --mode safehaven           # Safe Haven 阈值搜索（0.02-0.10）
+python scripts/compare_signals.py --mode breadth-div        # Breadth 背离参数搜索（threshold=15/20/25/30）
 python scripts/compare_signals.py --mode full --best-nday 5 --best-vix 30 --best-sh 0.02  # 全量比较
 
 # ── 执行层参数优化（精细调优用） ──
@@ -67,7 +68,7 @@ python main.py [--start-date YYYY-MM-DD] [--end-date YYYY-MM-DD]
 | 模块 | 文件 | 实现类 | 用途 |
 |------|------|--------|------|
 | **档口** | `tiers.py` | `FixedTiers`、`VolatilityTiers` | 限价挂单的价格层级（距开盘价的跌幅百分比） |
-| **入场** | `entry.py` | `UnconditionalEntry`、`EMAFilterEntry`、`NDayConfirmEntry`、`RSISignalEntry`、`BreadthEntry`、`VIXEntry`、`SafeHavenEntry`、`CombinedAndEntry`、`CombinedOrEntry` | 当日是否下市价单/挂限价单 |
+| **入场** | `entry.py` | `UnconditionalEntry`、`EMAFilterEntry`、`NDayConfirmEntry`、`RSISignalEntry`、`BreadthEntry`、`BreadthDivergenceEntry`、`VIXEntry`、`SafeHavenEntry`、`AndEntry`、`OrEntry` | 当日是否下市价单/挂限价单 |
 | **仓位** | `position.py` | `FixedPyramid`、`AdaptivePyramid`、`DowntrendOnly` | 各档买入股数 |
 | **止盈** | `take_profit.py` | `NoTakeProfit`、`DeviationPeakTP`、`TrendConfirmTP`、`DualTakeProfit` | 何时卖出并将利润分流至 SMH |
 
@@ -104,7 +105,7 @@ take_profit = NoTakeProfit()              # 不止盈
 
 - **主图**：K 线 + EMA 均线 + 交易标记（买入/止盈箭头）
 - **RSI 副图**：RSI(14) 曲线 + EMA(5) 快均线 + B/B+/B++/S/S+/S++ 信号标记
-- **Breadth 副图**：S&P 500 Market Breadth 曲线（0-100），20/50/80 参考线，上方绿色填充/下方红色填充
+- **Breadth 副图**：S&P 500 Market Breadth 曲线（0-100），20/50/80 参考线，上方绿色填充/下方红色填充，背离信号标记（橙色箭头 + 两低点连线）
 - **VIX 副图**：VIX 曲线，20/30 参考线，>30 红色恐慌区域填充
 - 四图时间轴和十字光标同步
 
@@ -138,7 +139,7 @@ take_profit = NoTakeProfit()              # 不止盈
 
 数据来源：用 yfinance 拉取当前 S&P 500 全部成分股历史收盘价，逐日计算"收盘价 > 20 日 SMA"的比例。存在幸存者偏差（用当前成分股回算历史），但在 2020 年后的近期数据中影响很小。
 
-已接入策略决策流程：`BreadthEntry`（Breadth < 20 时买入）。在近三年数据中成本优势排名第二（+6.63%）。详见 `docs/tasks/260504-breadth-entry-spy-signal-comparison/`。
+已接入策略决策流程：`BreadthEntry`（Breadth < 20 时买入，成本优势 +6.63%）、`BreadthDivergenceEntry`（SPY 价格创新低但 Breadth 未创新低时买入，成本优势 +2.56%，近三年仅 4 次信号）。背离检测算法在 `src/breadth_divergence.py`，参数：触发区域 Breadth < 25，swing low 窗口 N=5。交互式图表的 Breadth 副图上会标记背离信号（橙色箭头 + 连线）。详见 `docs/tasks/260505-xxz/`。
 
 ### VIX / Safe Haven Demand 情绪指标
 
@@ -150,16 +151,29 @@ take_profit = NoTakeProfit()              # 不止盈
 
 已接入策略决策流程：`VIXEntry`（VIX > 30 时买入，成本优势 +9.71%，排名第一）、`SafeHavenEntry`（Safe Haven > 0.02 时买入，成本优势 +1.03%，排名垫底）。详见 `docs/tasks/260504-sentiment-indicators-vix-pcr-safehaven/`。
 
+### Swing Low 波段底部检测
+
+`src/indicators/__init__.py` 中的 `detect_swing_lows()`、`detect_swing_highs()`、`filter_swing_lows_by_drop()` 实现波段底部检测。
+
+**Swing Low**：第 i 天收盘价严格小于左右各 N 天所有收盘价。日线用 N=10（前后各 2 周），周线用 N=5（前后各 5 周）。
+
+**最小跌幅过滤**：对每个 Swing Low，找到前面最近的 Swing High，计算跌幅 `(high - low) / high`。跌幅 < 3% 的视为横盘噪声，过滤掉。
+
+**用途**：
+1. **可视化**：在交互式图表 K 线主图上标注波段底部（橙色圆点 = 保留，灰色 × = 被过滤）
+2. **Oracle 基准**：取低于期间均价的 Swing Low 均价作为统一 Oracle 基准，用于计算所有策略的极值利用率。日线 Oracle 极值 = +15.35%，周线 = +18.65%。详见 `docs/ground-truth.md`。
+
 ### 核心支撑模块
 
 - `src/backtest_engine.py`：`BacktestEngine` + `Context`（每日上下文，包含 EMA、偏离度、持仓状态等）。运行时自动计算 RSI v2 信号并存入 metrics。
 - `src/portfolio.py`：`Portfolio` 类，管理 SPY 仓位、SMH 分流、带 TTL 过期的止盈挂单
-- `src/indicators/`：技术指标模块（`calc_ema`、`calc_rsi`、偏离度、波动率档口）。纯函数，list 输入 list 输出。
+- `src/indicators/`：技术指标模块（`calc_ema`、`calc_rsi`、`detect_swing_lows`、`detect_swing_highs`、`filter_swing_lows_by_drop`、偏离度、波动率档口）。纯函数，list 输入 list 输出。
 - `src/rsi_signals.py`：RSI v2 三事件信号系统（见上文）
+- `src/breadth_divergence.py`：Market Breadth 背离检测（SPY 价格新低 + Breadth 未新低 → 看多信号）
 - `src/metrics.py`：绩效指标（Sharpe、Calmar、最大回撤、年化收益率）
 - `src/data_loader.py`：CSV 加载器，输出 `[{'date', 'open', 'high', 'low', 'close'}, ...]`
 - `src/chart.py`：Matplotlib 图表生成 → `output/`（旧版路径）
-- `src/interactive_chart.py`：Lightweight Charts 交互式图表 + RSI 副图 + Breadth 副图 + VIX 副图 → HTTP 服务（引擎路径）
+- `src/interactive_chart.py`：Lightweight Charts 交互式图表 + RSI 副图 + Breadth 副图 + Swing Low 标记 → HTTP 服务（引擎路径）
 
 ### 配置系统（旧版路径）
 

@@ -109,19 +109,21 @@ def calc_max_drawdown_duration(daily_values):
     return max_duration
 
 
-def calc_sharpe_ratio(daily_values, annualized_return, risk_free_rate=0.0):
+def calc_sharpe_ratio(daily_values, annualized_return, risk_free_rate=0.0,
+                      periods_per_year=252):
     """
     计算夏普比率（适配 DCA 策略）
 
     DCA 策略每日有新资金注入，不能直接用日市值变化算收益率。
     采用业界通用做法：
     - 分子：用总投入/总回报计算的复合年化收益率
-    - 分母：用日市值变化率的年化波动率
+    - 分母：用市值变化率的年化波动率
 
     Args:
-        daily_values: 每日市值列表
+        daily_values: 每期市值列表
         annualized_return: 复合年化收益率（从总投入回报计算）
         risk_free_rate: 年化无风险利率
+        periods_per_year: 每年周期数（日线=252，周线=52）
 
     Returns:
         夏普比率
@@ -142,7 +144,7 @@ def calc_sharpe_ratio(daily_values, annualized_return, risk_free_rate=0.0):
     mean = sum(daily_returns) / len(daily_returns)
     variance = sum((r - mean) ** 2 for r in daily_returns) / len(daily_returns)
     std = math.sqrt(variance)
-    annualized_vol = std * math.sqrt(252)
+    annualized_vol = std * math.sqrt(periods_per_year)
 
     if annualized_vol == 0:
         return 0.0
@@ -150,16 +152,18 @@ def calc_sharpe_ratio(daily_values, annualized_return, risk_free_rate=0.0):
     return (annualized_return - risk_free_rate) / annualized_vol
 
 
-def calc_sortino_ratio(daily_values, annualized_return, risk_free_rate=0.0):
+def calc_sortino_ratio(daily_values, annualized_return, risk_free_rate=0.0,
+                       periods_per_year=252):
     """
     计算 Sortino 比率（适配 DCA 策略）
 
     与 Sharpe 类似，但分母只用下行波动率。
 
     Args:
-        daily_values: 每日市值列表
+        daily_values: 每期市值列表
         annualized_return: 复合年化收益率
         risk_free_rate: 年化无风险利率
+        periods_per_year: 每年周期数（日线=252，周线=52）
 
     Returns:
         Sortino 比率
@@ -183,7 +187,7 @@ def calc_sortino_ratio(daily_values, annualized_return, risk_free_rate=0.0):
 
     downside_variance = sum(r ** 2 for r in downside_returns) / len(daily_returns)
     downside_std = math.sqrt(downside_variance)
-    annualized_downside_vol = downside_std * math.sqrt(252)
+    annualized_downside_vol = downside_std * math.sqrt(periods_per_year)
 
     if annualized_downside_vol == 0:
         return 0.0
@@ -209,7 +213,8 @@ def calc_calmar_ratio(annualized_return, max_drawdown):
     return annualized_return / max_drawdown
 
 
-def calc_benchmark_sharpe(close_prices, annualized_return, risk_free_rate=0.0):
+def calc_benchmark_sharpe(close_prices, annualized_return, risk_free_rate=0.0,
+                          periods_per_year=252):
     """
     基准可比 Sharpe（可与买入持有直接对标）
 
@@ -239,7 +244,7 @@ def calc_benchmark_sharpe(close_prices, annualized_return, risk_free_rate=0.0):
     mean = sum(stock_returns) / len(stock_returns)
     variance = sum((r - mean) ** 2 for r in stock_returns) / len(stock_returns)
     std = math.sqrt(variance)
-    annualized_vol = std * math.sqrt(252)
+    annualized_vol = std * math.sqrt(periods_per_year)
 
     if annualized_vol == 0:
         return 0.0
@@ -247,7 +252,7 @@ def calc_benchmark_sharpe(close_prices, annualized_return, risk_free_rate=0.0):
     return (annualized_return - risk_free_rate) / annualized_vol
 
 
-def calc_buy_hold_metrics(close_prices, dates):
+def calc_buy_hold_metrics(close_prices, dates, periods_per_year=252):
     """
     计算同期买入持有的基准指标
 
@@ -274,7 +279,7 @@ def calc_buy_hold_metrics(close_prices, dates):
     mean = sum(stock_returns) / len(stock_returns)
     variance = sum((r - mean) ** 2 for r in stock_returns) / len(stock_returns)
     std = math.sqrt(variance)
-    annualized_vol = std * math.sqrt(252)
+    annualized_vol = std * math.sqrt(periods_per_year)
 
     bh_sharpe = (bh_ann_return / annualized_vol) if annualized_vol > 0 else 0.0
 
@@ -306,16 +311,18 @@ def calc_cost_advantage(avg_cost, period_avg_price):
     return (period_avg_price - avg_cost) / period_avg_price
 
 
-def calc_all_metrics(daily_values, total_cost, total_shares, dates, close_prices):
+def calc_all_metrics(daily_values, total_cost, total_shares, dates, close_prices,
+                     periods_per_year=252):
     """
     一次性计算所有评估指标
 
     Args:
-        daily_values: 每日总资产市值列表
+        daily_values: 每期总资产市值列表
         total_cost: 总投入成本
         total_shares: 总持股数
         dates: 日期列表 (YYYY-MM-DD 字符串)
-        close_prices: 每日收盘价列表
+        close_prices: 每期收盘价列表
+        periods_per_year: 每年周期数（日线=252，周线=52）
 
     Returns:
         包含所有指标的字典
@@ -332,16 +339,20 @@ def calc_all_metrics(daily_values, total_cost, total_shares, dates, close_prices
     ann_return = calc_annualized_return(total_return, calendar_days)
     max_dd, dd_peak_idx, dd_valley_idx = calc_max_drawdown(daily_values)
     max_dd_duration = calc_max_drawdown_duration(daily_values)
-    sharpe = calc_sharpe_ratio(daily_values, ann_return)
-    sortino = calc_sortino_ratio(daily_values, ann_return)
+    sharpe = calc_sharpe_ratio(daily_values, ann_return,
+                               periods_per_year=periods_per_year)
+    sortino = calc_sortino_ratio(daily_values, ann_return,
+                                  periods_per_year=periods_per_year)
     calmar = calc_calmar_ratio(ann_return, max_dd)
 
     avg_cost = total_cost / total_shares if total_shares > 0 else 0
     period_avg_price = sum(close_prices) / len(close_prices) if close_prices else 0
     cost_adv = calc_cost_advantage(avg_cost, period_avg_price)
 
-    benchmark_sharpe = calc_benchmark_sharpe(close_prices, ann_return)
-    bh_metrics = calc_buy_hold_metrics(close_prices, dates)
+    benchmark_sharpe = calc_benchmark_sharpe(close_prices, ann_return,
+                                             periods_per_year=periods_per_year)
+    bh_metrics = calc_buy_hold_metrics(close_prices, dates,
+                                       periods_per_year=periods_per_year)
 
     return {
         'start_date': start_date,

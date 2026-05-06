@@ -25,7 +25,7 @@ from src.strategies.composable import ComposableStrategy
 from src.modules.tiers import FixedTiers
 from src.modules.entry import (
     UnconditionalEntry, EMAFilterEntry, NDayConfirmEntry, RSISignalEntry,
-    CombinedAndEntry, CombinedOrEntry,
+    AndEntry, OrEntry,
 )
 from src.modules.position import FixedPyramid
 from src.modules.take_profit import NoTakeProfit
@@ -51,8 +51,8 @@ def build_entries(data):
         'NDayConfirm-3':  {'label': '连续3天低于EMA',      'entry': NDayConfirmEntry(n_days=3)},
         'NDayConfirm-5':  {'label': '连续5天低于EMA',      'entry': NDayConfirmEntry(n_days=5)},
         'RSISignal':      {'label': 'RSI v2 信号',        'entry': RSISignalEntry(data)},
-        'AND-NDay5+RSI':  {'label': 'NDay5 AND RSI',      'entry': CombinedAndEntry(data, n_days=5)},
-        'OR-NDay5+RSI':   {'label': 'NDay5 OR RSI',       'entry': CombinedOrEntry(data, n_days=5)},
+        'AND-NDay5+RSI':  {'label': 'NDay5 AND RSI',      'entry': AndEntry(NDayConfirmEntry(n_days=5), RSISignalEntry(data))},
+        'OR-NDay5+RSI':   {'label': 'NDay5 OR RSI',       'entry': OrEntry(NDayConfirmEntry(n_days=5), RSISignalEntry(data))},
     }
 
 

@@ -188,6 +188,110 @@ def calc_max_abs_change(history, lookback=7):
     return max_change
 
 
+def detect_swing_lows(close_prices, dates, n):
+    """
+    检测 Swing Low（摆动低点 / 局部最低点）
+
+    第 i 天是 swing low 当且仅当 close[i] 严格小于左右各 N 天的所有收盘价。
+
+    Args:
+        close_prices: 收盘价列表（按时间正序）
+        dates: 日期列表（与 close_prices 等长）
+        n: 窗口参数，左右各看 N 天
+
+    Returns:
+        [{'date': '2022-06-17', 'price': 373.87}, ...] 按时间正序排列
+    """
+    result = []
+    length = len(close_prices)
+    for i in range(n, length - n):
+        price = close_prices[i]
+        is_low = True
+        for j in range(i - n, i):
+            if price >= close_prices[j]:
+                is_low = False
+                break
+        if is_low:
+            for j in range(i + 1, i + n + 1):
+                if price >= close_prices[j]:
+                    is_low = False
+                    break
+        if is_low:
+            result.append({'date': dates[i], 'price': price})
+    return result
+
+
+def detect_swing_highs(close_prices, dates, n):
+    """
+    检测 Swing High（摆动高点 / 局部最高点）
+
+    第 i 天是 swing high 当且仅当 close[i] 严格大于左右各 N 天的所有收盘价。
+
+    Args:
+        close_prices: 收盘价列表（按时间正序）
+        dates: 日期列表（与 close_prices 等长）
+        n: 窗口参数，左右各看 N 天
+
+    Returns:
+        [{'date': '2022-01-04', 'price': 477.50}, ...] 按时间正序排列
+    """
+    result = []
+    length = len(close_prices)
+    for i in range(n, length - n):
+        price = close_prices[i]
+        is_high = True
+        for j in range(i - n, i):
+            if price <= close_prices[j]:
+                is_high = False
+                break
+        if is_high:
+            for j in range(i + 1, i + n + 1):
+                if price <= close_prices[j]:
+                    is_high = False
+                    break
+        if is_high:
+            result.append({'date': dates[i], 'price': price})
+    return result
+
+
+def filter_swing_lows_by_drop(swing_lows, swing_highs, min_drop=0.05):
+    """
+    最小跌幅过滤：去掉从前一个 swing high 到 swing low 跌幅不足 min_drop 的点
+
+    对每个 swing low，找到它之前最近的 swing high，计算跌幅：
+    drop = (high_price - low_price) / high_price
+    如果 drop < min_drop，视为横盘噪声，过滤掉。
+
+    Args:
+        swing_lows: detect_swing_lows 的输出
+        swing_highs: detect_swing_highs 的输出
+        min_drop: 最小跌幅阈值（如 0.05 = 5%）
+
+    Returns:
+        (kept, filtered) 两个列表，格式与输入相同
+    """
+    kept = []
+    filtered = []
+    for low in swing_lows:
+        # 找 low 之前最近的 swing high
+        prev_high = None
+        for high in swing_highs:
+            if high['date'] < low['date']:
+                prev_high = high
+            else:
+                break
+        if prev_high is None:
+            # 没有前置高点，保留
+            kept.append(low)
+            continue
+        drop = (prev_high['price'] - low['price']) / prev_high['price']
+        if drop >= min_drop:
+            kept.append(low)
+        else:
+            filtered.append(low)
+    return kept, filtered
+
+
 def _percentile(sorted_list, pct):
     """
     计算已排序列表的分位数（线性插值法）

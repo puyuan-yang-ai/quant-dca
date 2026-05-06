@@ -16,7 +16,9 @@ _HTML_FILENAME = 'interactive.html'
 
 def show_interactive_chart(data, metrics, title='SOXL DCA 回测',
                            output_dir='output', port=9870, breadth_data=None,
-                           vix_data=None):
+                           vix_data=None, breadth_divergences=None,
+                           breadth_consec=None, swing_lows=None,
+                           show_trades=True):
     """
     生成交互式 K 线图并启动 HTTP 服务
 
@@ -45,32 +47,33 @@ def show_interactive_chart(data, metrics, title='SOXL DCA 回测',
     # 构建交易标记
     markers = []
     trade_log = metrics.get('trade_log', [])
-    for trade in trade_log:
-        if trade['type'] == 'market_buy':
-            markers.append({
-                'time': trade['date'],
-                'position': 'belowBar',
-                'shape': 'arrowUp',
-                'color': '#2196F3',
-                'text': f"买 {trade['shares']:.2f}股",
-            })
-        elif trade['type'] == 'limit_buy':
-            pct = round((1 - trade['tier']) * 100)
-            markers.append({
-                'time': trade['date'],
-                'position': 'belowBar',
-                'shape': 'arrowUp',
-                'color': '#4CAF50',
-                'text': f"限买 跌{pct}%",
-            })
-        elif trade['type'] == 'tp_sell':
-            markers.append({
-                'time': trade['date'],
-                'position': 'aboveBar',
-                'shape': 'arrowDown',
-                'color': '#F44336',
-                'text': f"止盈 ${trade['profit']:.0f}",
-            })
+    if show_trades:
+        for trade in trade_log:
+            if trade['type'] == 'market_buy':
+                markers.append({
+                    'time': trade['date'],
+                    'position': 'belowBar',
+                    'shape': 'arrowUp',
+                    'color': '#2196F3',
+                    'text': f"买 {trade['shares']:.2f}股",
+                })
+            elif trade['type'] == 'limit_buy':
+                pct = round((1 - trade['tier']) * 100)
+                markers.append({
+                    'time': trade['date'],
+                    'position': 'belowBar',
+                    'shape': 'arrowUp',
+                    'color': '#4CAF50',
+                    'text': f"限买 跌{pct}%",
+                })
+            elif trade['type'] == 'tp_sell':
+                markers.append({
+                    'time': trade['date'],
+                    'position': 'aboveBar',
+                    'shape': 'arrowDown',
+                    'color': '#F44336',
+                    'text': f"止盈 ${trade['profit']:.0f}",
+                })
 
     # 按时间排序（Lightweight Charts 要求）
     markers.sort(key=lambda m: m['time'])
@@ -126,7 +129,10 @@ def show_interactive_chart(data, metrics, title='SOXL DCA 回测',
 
     html = _build_html(title, candles, ema_data, markers, summary,
                        rsi_data, fast_ma_data, rsi_markers,
-                       breadth_data=breadth_data, vix_data=vix_data)
+                       breadth_data=breadth_data, vix_data=vix_data,
+                       breadth_divergences=breadth_divergences,
+                       breadth_consec=breadth_consec,
+                       swing_lows=swing_lows)
 
     os.makedirs(output_dir, exist_ok=True)
     filepath = os.path.join(output_dir, _HTML_FILENAME)
@@ -197,12 +203,13 @@ def _get_hostname():
 
 def _build_html(title, candles, ema_data, markers, summary,
                 rsi_data=None, fast_ma_data=None, rsi_markers=None,
-                breadth_data=None, vix_data=None):
+                breadth_data=None, vix_data=None, breadth_divergences=None,
+                breadth_consec=None, swing_lows=None):
     """生成自包含的 HTML 文件内容"""
 
-    has_rsi = rsi_data and len(rsi_data) > 0
-    has_breadth = breadth_data and len(breadth_data) > 0
-    has_vix = vix_data and len(vix_data) > 0
+    has_rsi = bool(rsi_data and len(rsi_data) > 0)
+    has_breadth = bool(breadth_data and len(breadth_data) > 0)
+    has_vix = bool(vix_data and len(vix_data) > 0)
 
     # 高度分配：根据面板数量动态调整
     sub_count = sum([has_rsi, has_breadth, has_vix])
@@ -339,6 +346,34 @@ const breadthSeries = breadthChart.addLineSeries({{
 const breadthData = {json.dumps(breadth_data)};
 breadthSeries.setData(breadthData);
 
+// ── 连续弱势曲线 c2~c5 ──
+const breadthConsec = {json.dumps(breadth_consec if breadth_consec else {{}})};
+const consecColors = {{
+  c2: '#66BB6A',  // 绿色
+  c3: '#FFA726',  // 橙色
+  c4: '#EF5350',  // 红色
+  c5: '#AB47BC',  // 紫色
+}};
+const consecLabels = {{
+  c2: 'C2 (≥2天)',
+  c3: 'C3 (≥3天)',
+  c4: 'C4 (≥4天)',
+  c5: 'C5 (≥5天)',
+}};
+['c2', 'c3', 'c4', 'c5'].forEach(key => {{
+  if (breadthConsec[key] && breadthConsec[key].length > 0) {{
+    const s = breadthChart.addLineSeries({{
+      color: consecColors[key],
+      lineWidth: 1,
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: false,
+      title: consecLabels[key],
+    }});
+    s.setData(breadthConsec[key]);
+  }}
+}});
+
 // 填充区域：用 Baseline Series 实现 Breadth 曲线本身的上下填色
 // 当 Breadth > 80 时显示绿色填充，< 20 时显示红色填充
 const breadthFill = breadthChart.addBaselineSeries({{
@@ -360,6 +395,37 @@ breadthFill.setData(breadthData);
 breadthSeries.createPriceLine({{ price: 80, color: '#26a69a', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '' }});
 breadthSeries.createPriceLine({{ price: 50, color: '#787B86', lineWidth: 1, lineStyle: 1, axisLabelVisible: false, title: '' }});
 breadthSeries.createPriceLine({{ price: 20, color: '#ef5350', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '' }});
+
+// ── Breadth 背离标记 + 连线 ──
+const breadthDivergences = {json.dumps(breadth_divergences if breadth_divergences else [])};
+if (breadthDivergences.length > 0) {{
+  // 背离标记（在触发点 B 处画向上箭头）
+  const divMarkers = breadthDivergences.map(d => ({{
+    time: d.date_b,
+    position: 'belowBar',
+    shape: 'arrowUp',
+    color: '#FF6D00',
+    text: 'Div',
+  }}));
+  divMarkers.sort((a, b) => a.time < b.time ? -1 : 1);
+  breadthSeries.setMarkers(divMarkers);
+
+  // 背离连线（A→B 两点之间画线，每条背离一条独立线段）
+  breadthDivergences.forEach(d => {{
+    const lineSeries = breadthChart.addLineSeries({{
+      color: '#FF6D00',
+      lineWidth: 2,
+      lineStyle: 2,  // 虚线
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: false,
+    }});
+    lineSeries.setData([
+      {{ time: d.date_a, value: d.breadth_a }},
+      {{ time: d.date_b, value: d.breadth_b }},
+    ]);
+  }});
+}}
 
 // 将 Breadth 图加入同步数组（如果存在）
 if (typeof allCharts !== 'undefined') {{
@@ -620,8 +686,27 @@ if (emaData.length > 0) {{
   emaSeries.setData(emaData);
 }}
 
-// 交易标记
+// 交易标记 + Swing Low 标记（合并到同一个 markers 数组）
 const markers = {json.dumps(markers, ensure_ascii=False)};
+const swingLows = {json.dumps(swing_lows if swing_lows else {{}})};
+// Swing Low 标记：保留=橙色，被过滤=灰色
+const swingConfig = {{
+  '10': {{ color: '#FF6D00', text: 'SL10' }},
+  'filtered': {{ color: '#888888', text: 'x' }},
+}};
+Object.keys(swingLows).forEach(key => {{
+  const cfg = swingConfig[key] || {{ color: '#888', text: 'SL' }};
+  (swingLows[key] || []).forEach(pt => {{
+    markers.push({{
+      time: pt.date,
+      position: 'belowBar',
+      shape: 'circle',
+      color: cfg.color,
+      text: cfg.text,
+    }});
+  }});
+}});
+markers.sort((a, b) => a.time < b.time ? -1 : a.time > b.time ? 1 : 0);
 if (markers.length > 0) {{
   candleSeries.setMarkers(markers);
 }}

@@ -191,49 +191,208 @@ class SafeHavenEntry:
         return f"SafeHavenEntry(threshold={self.threshold}, signals={len(self._buy_dates)})"
 
 
-class CombinedAndEntry:
+class BreadthConsecutiveEntry:
     """
-    NDayConfirm AND RSI：双重确认
+    Breadth 连续弱势曲线驱动入场
 
-    连续 N 天低于 EMA 且 RSI 触发买入信号时才买入。
-    趋势确认 + 动量超卖同时满足，过滤最严格。
+    breadth_cN < threshold 时买入。
+    N 表示连续低于 MA20 的天数（2/3/4/5），值越大条件越严格。
+    构造时传入 Breadth CSV 路径和参数，预计算满足条件的日期集合。
     """
 
-    def __init__(self, data, n_days=5):
-        self.n_days = n_days
-        self._buy_dates = _extract_buy_dates(data)
+    def __init__(self, breadth_csv, n, threshold):
+        self.n = n
+        self.threshold = threshold
+        self._buy_dates = self._load_buy_dates(breadth_csv, n, threshold)
+
+    @staticmethod
+    def _load_buy_dates(csv_path, n, threshold):
+        import csv as csv_mod
+        col = f'breadth_c{n}'
+        buy_dates = set()
+        with open(csv_path, 'r') as f:
+            reader = csv_mod.DictReader(f)
+            for row in reader:
+                if col in row and float(row[col]) < threshold:
+                    buy_dates.add(row['date'])
+        return buy_dates
 
     def should_market_buy(self, context):
-        nday_ok = context.consecutive_below_ema >= self.n_days
-        rsi_ok = context.day['date'] in self._buy_dates
-        return nday_ok and rsi_ok
+        return context.day['date'] in self._buy_dates
 
     def should_place_limits(self, context):
         return False
 
     def __repr__(self):
-        return f"CombinedAndEntry(n={self.n_days}, rsi_signals={len(self._buy_dates)})"
+        return (f"BreadthConsecutiveEntry(n={self.n}, threshold={self.threshold}, "
+                f"signals={len(self._buy_dates)})")
 
 
-class CombinedOrEntry:
+class SpreadConvergenceEntry:
     """
-    NDayConfirm OR RSI：双通道
+    Breadth 曲线 spread 收敛买入信号（状态机式）
 
-    连续 N 天低于 EMA 或 RSI 触发买入信号，任一条件满足即买入。
-    覆盖面最广，互补两种信号的盲区。
+    当 c1(breadth) 进入恐慌区（<20）后，观察 c5-c1 的 spread 是否在收敛，
+    收敛时买入。可选右侧停止条件（c3-c1 < close_threshold 时停止买入）。
+
+    参数：
+        breadth_csv: Breadth CSV 路径
+        close_threshold: c3-c1 < X 时停止买入（None = 无停止条件，只靠 c1>=20 退出）
+        require_c1_rising: True = 需要 c1 回升方向确认（实验B），False = 纯收敛（实验A）
     """
 
-    def __init__(self, data, n_days=5):
-        self.n_days = n_days
-        self._buy_dates = _extract_buy_dates(data)
+    def __init__(self, breadth_csv, close_threshold=None, require_c1_rising=False):
+        self.close_threshold = close_threshold
+        self.require_c1_rising = require_c1_rising
+        self._buy_dates = self._compute(breadth_csv, close_threshold, require_c1_rising)
+
+    @staticmethod
+    def _compute(csv_path, close_threshold, require_c1_rising):
+        import csv as csv_mod
+        # 加载数据
+        rows = []
+        with open(csv_path, 'r') as f:
+            reader = csv_mod.DictReader(f)
+            for row in reader:
+                if 'breadth_c3' not in row or 'breadth_c5' not in row:
+                    continue
+                rows.append({
+                    'date': row['date'],
+                    'c1': float(row['breadth']),
+                    'c3': float(row['breadth_c3']),
+                    'c5': float(row['breadth_c5']),
+                })
+
+        buy_dates = set()
+        state = 'WAITING'  # WAITING / OBSERVING / STOPPED
+        prev_spread = None
+        prev_c1 = None
+
+        for r in rows:
+            c1, c3, c5 = r['c1'], r['c3'], r['c5']
+            spread = c5 - c1
+
+            if state == 'WAITING':
+                if c1 < 20:
+                    state = 'OBSERVING'
+                    # 第一天进入恐慌区，记录 spread 但不买入（需要昨日数据来判断收敛）
+                    prev_spread = spread
+                    prev_c1 = c1
+                    continue
+
+            elif state == 'OBSERVING':
+                if c1 >= 20:
+                    state = 'WAITING'
+                    prev_spread = None
+                    prev_c1 = None
+                    continue
+
+                # 检查停止条件
+                if close_threshold is not None and (c3 - c1) < close_threshold:
+                    state = 'STOPPED'
+                    prev_spread = None
+                    prev_c1 = None
+                    continue
+
+                # 检查买入条件
+                if prev_spread is not None and spread < prev_spread:
+                    if require_c1_rising:
+                        if prev_c1 is not None and c1 > prev_c1:
+                            buy_dates.add(r['date'])
+                    else:
+                        buy_dates.add(r['date'])
+
+            elif state == 'STOPPED':
+                if c1 >= 20:
+                    state = 'WAITING'
+                    prev_spread = None
+                    prev_c1 = None
+                    continue
+
+            prev_spread = spread
+            prev_c1 = c1
+
+        return buy_dates
 
     def should_market_buy(self, context):
-        nday_ok = context.consecutive_below_ema >= self.n_days
-        rsi_ok = context.day['date'] in self._buy_dates
-        return nday_ok or rsi_ok
+        return context.day['date'] in self._buy_dates
 
     def should_place_limits(self, context):
         return False
 
     def __repr__(self):
-        return f"CombinedOrEntry(n={self.n_days}, rsi_signals={len(self._buy_dates)})"
+        ct = self.close_threshold
+        mode = 'B(方向确认)' if self.require_c1_rising else 'A(纯收敛)'
+        return (f"SpreadConvergenceEntry(stop={ct}, mode={mode}, "
+                f"signals={len(self._buy_dates)})")
+
+
+class BreadthDivergenceEntry:
+    """
+    Market Breadth 背离驱动入场
+
+    SPY 价格创新低但 Breadth 未创新低时买入（下跌参与度减少 → 底部形成）。
+    与 RSI v2 Event 3 逻辑同构。
+    构造时传入 Breadth 和 SPY CSV 路径，预计算背离日期集合。
+    """
+
+    def __init__(self, breadth_csv, spy_csv, threshold=25, window=5):
+        from src.breadth_divergence import detect_breadth_divergence
+        self.threshold = threshold
+        self.window = window
+        result = detect_breadth_divergence(breadth_csv, spy_csv, threshold, window)
+        self._buy_dates = result['buy_dates']
+
+    def should_market_buy(self, context):
+        return context.day['date'] in self._buy_dates
+
+    def should_place_limits(self, context):
+        return False
+
+    def __repr__(self):
+        return (f"BreadthDivergenceEntry(threshold={self.threshold}, "
+                f"window={self.window}, signals={len(self._buy_dates)})")
+
+
+class AndEntry:
+    """
+    通用 AND 组合器
+
+    两个 Entry 同时触发市价买入时才买入。
+    用于组合任意两个信号策略，如 VIX + Breadth、NDay + RSI 等。
+    """
+
+    def __init__(self, entry_a, entry_b):
+        self.a = entry_a
+        self.b = entry_b
+
+    def should_market_buy(self, context):
+        return self.a.should_market_buy(context) and self.b.should_market_buy(context)
+
+    def should_place_limits(self, context):
+        return False
+
+    def __repr__(self):
+        return f"AndEntry({self.a!r}, {self.b!r})"
+
+
+class OrEntry:
+    """
+    通用 OR 组合器
+
+    两个 Entry 中任一触发市价买入即买入。
+    用于组合任意两个信号策略，覆盖面最广。
+    """
+
+    def __init__(self, entry_a, entry_b):
+        self.a = entry_a
+        self.b = entry_b
+
+    def should_market_buy(self, context):
+        return self.a.should_market_buy(context) or self.b.should_market_buy(context)
+
+    def should_place_limits(self, context):
+        return False
+
+    def __repr__(self):
+        return f"OrEntry({self.a!r}, {self.b!r})"

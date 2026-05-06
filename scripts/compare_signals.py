@@ -22,8 +22,9 @@ from src.strategies.composable import ComposableStrategy
 from src.modules.tiers import FixedTiers
 from src.modules.entry import (
     UnconditionalEntry, EMAFilterEntry, NDayConfirmEntry, RSISignalEntry,
-    CombinedAndEntry, CombinedOrEntry, BreadthEntry,
-    VIXEntry, SafeHavenEntry,
+    AndEntry, OrEntry, BreadthEntry, BreadthConsecutiveEntry,
+    BreadthDivergenceEntry, VIXEntry, SafeHavenEntry,
+    SpreadConvergenceEntry,
 )
 from src.modules.position import FixedPyramid
 from src.modules.take_profit import NoTakeProfit
@@ -38,6 +39,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BREADTH_CSV = os.path.join(ROOT, 'data', 'sp500_breadth.csv')
 VIX_CSV = os.path.join(ROOT, 'data', 'vix_daily.csv')
 SH_CSV = os.path.join(ROOT, 'data', 'safe_haven.csv')
+SPY_CSV = os.path.join(ROOT, 'data', 'SPY_adjusted.csv')
 
 
 def build_entries_nday():
@@ -73,6 +75,48 @@ def build_entries_safehaven():
     return entries
 
 
+def build_entries_breadth_div():
+    """Breadth 背离参数搜索（threshold）"""
+    entries = {}
+    for t in [15, 20, 25, 30]:
+        entries[f'BreadthDiv-t{t}'] = {
+            'label': f'Breadth背离<{t}',
+            'entry': BreadthDivergenceEntry(BREADTH_CSV, SPY_CSV, threshold=t),
+        }
+    return entries
+
+
+def build_entries_breadth_consec():
+    """Breadth 连续弱势曲线阈值搜索（c2~c5 × 阈值 20~34 步长 2）"""
+    entries = {}
+    for n in [2, 3, 4, 5]:
+        for t in range(20, 36, 2):
+            entries[f'BreadthC{n}<{t}'] = {
+                'label': f'C{n}(≥{n}天)<{t}',
+                'entry': BreadthConsecutiveEntry(BREADTH_CSV, n=n, threshold=t),
+            }
+    return entries
+
+
+def build_entries_spread_convergence():
+    """Breadth spread 收敛信号实验（A: 纯收敛, B: 方向确认）× 停止条件"""
+    entries = {}
+    stop_thresholds = [1, 2, 3, 5, None]  # None = 无停止条件
+    for stop in stop_thresholds:
+        label_stop = f'stop={stop}' if stop is not None else '无stop'
+        # 实验 A：纯 spread 收敛
+        entries[f'A-{label_stop}'] = {
+            'label': f'A纯收敛({label_stop})',
+            'entry': SpreadConvergenceEntry(BREADTH_CSV, close_threshold=stop, require_c1_rising=False),
+        }
+        # 实验 B：spread 收敛 + c1 回升
+        entries[f'B-{label_stop}'] = {
+            'label': f'B方向确认({label_stop})',
+            'entry': SpreadConvergenceEntry(BREADTH_CSV, close_threshold=stop, require_c1_rising=True),
+        }
+    return entries
+
+
 def build_entries_full(data, best_nday, best_vix=30, best_sh=0.05):
     """第二轮：全量比较，使用指定的最优参数"""
     n = best_nday
@@ -81,11 +125,12 @@ def build_entries_full(data, best_nday, best_vix=30, best_sh=0.05):
         'EMAFilter':            {'label': 'EMA 均线过滤',             'entry': EMAFilterEntry()},
         f'NDayConfirm-{n}':     {'label': f'连续{n}天低于EMA(best)',  'entry': NDayConfirmEntry(n_days=n)},
         'RSISignal':            {'label': 'RSI v2 信号',              'entry': RSISignalEntry(data)},
-        f'AND-NDay{n}+RSI':     {'label': f'NDay{n} AND RSI',        'entry': CombinedAndEntry(data, n_days=n)},
-        f'OR-NDay{n}+RSI':      {'label': f'NDay{n} OR RSI',         'entry': CombinedOrEntry(data, n_days=n)},
+        f'AND-NDay{n}+RSI':     {'label': f'NDay{n} AND RSI',        'entry': AndEntry(NDayConfirmEntry(n_days=n), RSISignalEntry(data))},
+        f'OR-NDay{n}+RSI':      {'label': f'NDay{n} OR RSI',         'entry': OrEntry(NDayConfirmEntry(n_days=n), RSISignalEntry(data))},
         'Breadth<20':           {'label': 'Breadth<20 恐慌买入',      'entry': BreadthEntry(BREADTH_CSV)},
         f'VIX>{best_vix}':      {'label': f'VIX>{best_vix} 恐慌买入', 'entry': VIXEntry(VIX_CSV, threshold=best_vix)},
         f'SH>{best_sh}':        {'label': f'SafeHaven>{best_sh}',    'entry': SafeHavenEntry(SH_CSV, threshold=best_sh)},
+        'BreadthDiv':           {'label': 'Breadth背离',              'entry': BreadthDivergenceEntry(BREADTH_CSV, SPY_CSV)},
     }
 
 
@@ -212,9 +257,13 @@ def run_comparison(entries_builder, title, needs_data=True):
 def main():
     parser = argparse.ArgumentParser(description='信号策略比较')
     parser.add_argument('--mode', type=str, default='default',
-                        choices=['default', 'nday', 'vix', 'safehaven', 'full'],
+                        choices=['default', 'nday', 'vix', 'safehaven', 'breadth-div',
+                                 'breadth-consecutive', 'spread-convergence', 'full'],
                         help='运行模式：default=兼容旧版, nday=NDay参数搜索, '
-                             'vix=VIX参数搜索, safehaven=SafeHaven参数搜索, full=全量比较')
+                             'vix=VIX参数搜索, safehaven=SafeHaven参数搜索, '
+                             'breadth-div=Breadth背离参数搜索, '
+                             'breadth-consecutive=连续弱势曲线阈值搜索, '
+                             'spread-convergence=spread收敛信号实验, full=全量比较')
     parser.add_argument('--best-nday', type=int, default=5,
                         help='全量比较时使用的最优 NDay 参数（默认 5）')
     parser.add_argument('--best-vix', type=int, default=30,
@@ -239,6 +288,24 @@ def main():
         run_comparison(
             entries_builder=build_entries_safehaven,
             title='Safe Haven 阈值参数搜索（0.02/0.05/0.08/0.10）',
+            needs_data=False,
+        )
+    elif args.mode == 'breadth-div':
+        run_comparison(
+            entries_builder=build_entries_breadth_div,
+            title='Breadth 背离参数搜索（threshold=15/20/25/30）',
+            needs_data=False,
+        )
+    elif args.mode == 'breadth-consecutive':
+        run_comparison(
+            entries_builder=build_entries_breadth_consec,
+            title='Breadth 连续弱势曲线阈值搜索（c2~c5 × 阈值 20~34 步长 2）',
+            needs_data=False,
+        )
+    elif args.mode == 'spread-convergence':
+        run_comparison(
+            entries_builder=build_entries_spread_convergence,
+            title='Spread 收敛信号实验（A: 纯收敛 / B: 方向确认 × 停止条件）',
             needs_data=False,
         )
     elif args.mode == 'full':

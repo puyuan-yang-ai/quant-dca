@@ -42,12 +42,14 @@ class BacktestEngine:
         ema_period: EMA 周期
     """
 
-    def __init__(self, data, smh_data, fee_rate, strategy, ema_period=20):
+    def __init__(self, data, smh_data, fee_rate, strategy, ema_period=20,
+                 periods_per_year=252):
         self.data = data
         self.smh_data = smh_data
         self.fee_rate = fee_rate
         self.strategy = strategy
         self.ema_period = ema_period
+        self.periods_per_year = periods_per_year
 
         self._smh_by_date = {d['date']: d for d in smh_data} if smh_data else {}
 
@@ -209,6 +211,7 @@ class BacktestEngine:
             total_shares=portfolio.soxl_shares,
             dates=dates,
             close_prices=soxl_close_prices,
+            periods_per_year=self.periods_per_year,
         )
 
         # 补充 SMH 和交易统计
