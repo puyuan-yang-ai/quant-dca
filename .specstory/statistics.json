@@ -72,6 +72,15 @@
       "provider": "claude",
       "last_updated": "2026-05-06T14:05:39Z"
     },
+    "92d4b993-9870-4fe5-9fef-7e3948f5821c": {
+      "user_message_count": 8,
+      "agent_message_count": 63,
+      "start_timestamp": "2026-05-15T11:48:28+08:00",
+      "end_timestamp": "2026-05-15T11:48:28+08:00",
+      "markdown_size_bytes": 102987,
+      "provider": "cursoride",
+      "last_updated": "2026-05-15T04:52:43Z"
+    },
     "a8d4b063-ca33-424a-aebb-0e4f3a804706": {
       "user_message_count": 49,
       "agent_message_count": 279,

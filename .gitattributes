@@ -1,0 +1,8 @@
+# 所有文本文件统一使用 LF（跨平台一致，Windows checkout 不自动转 CRLF）
+* text=auto eol=lf
+
+# 明确标记二进制文件，不做行尾处理
+*.csv binary
+*.png binary
+*.jpg binary
+*.ico binary
