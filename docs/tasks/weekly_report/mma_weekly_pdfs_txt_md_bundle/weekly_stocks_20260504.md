@@ -1,0 +1,221 @@
+# MMA WEEKLY STOCK INDICES REPORT
+
+## FOR THE WEEK OF MAY 4, 2026
+
+## GEOCOSMIC CRITICAL REVERSAL DATES (CRDs)
+
+These dates affect all markets. They are the midpoints of geocosmic clusters and have a normal orb of three days on either side (82% rate of frequency). Sometimes, they expand to as much as six days (90+% frequency with that orb). The idea is to see a new two-week or greater high or low and then a reversal. It is especially effective when major, half -primary, or primary cycle troughs are due. These are more important than the solar-lunar reversal dates: the more stars, the greater the historical correlation with a cycle culmination. Please read Volume 3 of the Stock Market Timing series for more information. Below is the midpoint date, and in parentheses, the length of time containing the geocosmic signatures (known as a "cluster"). If the cluster is long (more than 15 days), there may be other possible reversals based on tighter geocosmic clusters within the greater cluster.
+
+Apr 24-27** (low in Gold, Silver, maybe T-notes, Euro, and DJIA too) May 5*(in effect now) May 25*** (holiday, so May 22-26, T-Notes highlighted) June 26-29*
+
+These periods are usually more important than the solar/lunar reversal zones . They are usually more accurate because they have a wider orb of time (+/- 3 trading days vs. +/- 1 trading day for solar/lunars). They will correspond more often with major, half -primary, or full primary cycles, whereas lunar reversals need only correspond to 2.5% reversals in stocks.
+
+### ABBREVIATIONS:
+
+CRD = Geocosmic Critical Reversal Date ATH = All-Time High MA = Moving Average PB = Primary cycle bottom PT = Primary cycle top MB = Major cycle bottom MT = Major cycle top TB = Trading cycle bottom TT = Trading cycle top
+
+DJIA Cash: Review by Gianni Di Poce and Ray Merriman, MMA Analysts : Last week's close was mixed. The close was above the weekly trend indicator point (TIP) for the 5th consecutive week, which means it remains in a trend run-up.
+
+<!-- PAGE 1 END -->
+
+This week's trend indicator point (TIP) is 49,201. It will be downgraded back to neutral if it closes below there this week.
+
+Weekly support is 48,809-48,859. A trade below, followed by a close back above this range, is a bullish trigger. Weekly resistance is 50,089-50,139. A trade above here, followed by a close back below this range, is a bearish trigger.
+
+Bullish crossover zones are in effect at 42,515-42,826, 36,359-36,747, 35,379-35,753, 34,442-34,524, 32,890-33,248, 31,468 -31,997, 30,488 -30,521, 24,769 -24,894, 21,925 -22,561, 18,931 -19,018, 18,043 18,408, 17,348-17,352, 15,029-15,149, 13,717-13,760, 13,070-13,163, 12,799-12,802, 11,513-11,572, and 8266-8433.
+
+The DJIA closed above bearish crossover zones previously at 46,489-46,529, 46,178-46,285, 44,39144,529, 44,071 -44,213, 35,208 -36,348, 34,981 -35,530, 34,378 -34,426, 27,522-28,013, 20,599 -21,252, 18,318-18,367, 18,083-18,087, and 16,892-17,314, so these are now support.
+
+## Trend Indicator Studies
+
+The Basic Trend Indicator is still bullish, but it’s increasingly in need of a new all-time high for further confirmation. The long-term and intermediate-term are solidly bullish. But in the near term, it will turn fully bullish if and when it hits a new all-time high. In the meantime, another higher-low is possible in the coming weeks, perhaps via a major cycle trough. Since there’s a new primary and 50-week cycle in effect, ample time remains for this to happen.
+
+The weekly trend-moving average indicator remains bullish in the Dow. The DJIA closed the week at 49,499, up 268 points from the prior week. The close was above the 25-week moving average ( 48,209) and the 50-week MA (46,528), but above the 78-week MA (45,156). The 25-week MA remains above the 50-week MA, and the 25 - and 50-week MAs are well above the 78 -week MA. Prices are above all the moving averages, so it’s bullish . The Dow looks to be on the verge of new 3-year cycle highs after completing its 50-week cycle low, which occurred in the 51st week. The 50-week cycle has a range of 3467 weeks, and mostly 38-62 weeks, so it fell in the regular time band. We would only be in the 5 th week of a new 50 -week cycle. The faster-moving averages remain above the slower ones, and as long as this continues, the worst that could happen is for the Dow to be downgraded back to neutral.
+
+Prices would have to decline below all moving averages to be downgraded back to neutral. The Dow would have to drop below each MA, with each faster MA crossing below the slower -moving averages to be downgraded to "bearish." If the 25-week MA moves back above the 50-week MA, with prices remaining above all three, it will be upgraded to fully bullish again.
+
+The daily moving average trend study (for traders) is upgraded to bullish. The daily close (49,499) was above the 15-day moving average (49,079) and the 45-day MA at 47,698. The 15-day moving average is above the 45-day moving average, and with prices above both, it’s bullish. It would be downgraded back to bearish if prices closed below both the 15-day average and the 45-day moving average, and the 15-day drops below the 45-day. It will be downgraded to bullish, turning neutral if prices drop below the 15-day moving average, but it stays above the 45-day moving average. Note how prices tested the 15-day moving average last week, which would typically be a candidate for a major cycle trough. However, it was one week too soon.
+
+<!-- PAGE 2 END -->
+
+## The Primary Cycle and Longer Cycles
+
+Preferred primary cycle labeling: This week begins the 5th week in the primary cycle, measured from the March 30 low at 45,057. The low occurred 19 weeks following the November 20 low at 45,728, and in the regular 13-23 week range for a cycle bottom. The low also unfolded one day outside the 3-day orb of the April 3-6 CRD, after a 7-week decline from the all-time high of February 10 at 50,512. The Dow remains in the early stages of a new and bullish primary cycle, with plenty of time for new all-time highs to follow.
+
+The primary cycle in the Dow breaks down into two or three cycle phases. Major cycles (three-phase) in the Dow have a range of 5-8 weeks, while half-primary cycles (two-phase) have a range of 8-11 weeks. We’re approaching a moment of clarity when it comes to the phase breakdown, as there’s a major cycle crest candidate on May 1 at 49,988. This high would’ve been in the orb of the May 5 CRD, and so any 3-8 day corrective decline now is a candidate for a major cycle trough.
+
+At this stage of the cycle, any pullback should be temporary. Since our bias is for this primary cycle to be bullish, a rally beyond Tuesday of the 9 th week is anticipated. However, if it’s going to be a bearish primary cycle, a high between weeks 2-5 would be expected. We’re in the final week of this range now.
+
+But as explained last week as well, “ Keep in mind that the primary cycle low of March 30 was the third and final phase low within the greater 50 -week cycle. This means that a new 50 -week cycle is underway, in addition to the primary cycle. This is only the first primary cycle phase within that cycle, and since the bias is for the first phase to be bullish, we’re looking for a rally to last beyond Tuesday of the 9 th week, or into early June at least.” The new 50-week cycle is an additional tailwind factor for the Dow, too.
+
+Alternate primary cycle labeling: There is none anymore.
+
+<!-- PAGE 3 END -->
+
+## Geocosmics and CRDs
+
+Last week’s report stated, “ We’re now in the era of Uranus in Gemini, too. The Dow is near an all time high, and typically, Uranus signatures are a magnet to break out and form a new ATH. Any pullbacks in this environment are considered to be a buying opportunity, and this is also th e time to consider “breakout strategies” where we go long after every new high that forms after an isolated low, with a stoploss below the last isolated low or trading cycle trough, depending on your risk allowance.” We didn’t quite see new all-time highs in the Dow (yet), but did in the S&P and Nasdaq. This week, the orb of the May 5 CRD is in effect, and the featured signatures are Mars square Jupiter (May 4) and Pluto retrograde (May 6). Let’s see if a major cycle low forms this week in the Dow.
+
+Further ahead, we note that Mars will transit 22-27° Aries, conjoing the NYSE Saturn and in opposition to its Jupiter/Neptune conjunction in Libra, May 8-16. That would be a fine time for a major cycle trough. However, with Jupiter and Neptune involved, it could just as easily be a major or half-primary cycle crest, as its primary function is as a reversal.
+
+## Technicals, Chart Patterns, and Price Targets
+
+Price Targets & Chart Patterns : The Dow hit a new cycle high last week as it maintains its strong bullish posturing. It broke out from the descending price channel a few weeks back and never looked back. These are continuation patterns, and the longer -term and intermediate-term trend is fully bu llish, with the short-term trend on the verge of a major upgrade, which would be achieved via a new all-time high.
+
+As stated in prior weeks, “As long as the Dow holds above the former support-turned-resistance zone at 48,500-49,000, the path of least resistance remains higher, with a bias to new all -time highs”…and… “The downside objective of 43,562 +/ - 1640 was achieved at the 50 -week low, and it looks poised to hit the upside target of 53,450 +/ - 1990. Near-term, we could see a pullback to 48,250 +/ - 60 as the market digests new geopolitical headlines.” Still the case as the Dow recently closed at its highest monthly level in history on April 30. The first upside target is still 53,450 +/ - 1990, with an even bigger target around 59,500-60,500 into later this year.
+
+Intermarket Divergence: Another week with ESM and NQM hitting new all -time highs, but not the DJIA, for a sustained case of intermarket bearish divergence. Since we’re in the time band for a major cycle trough now, this warns of a pause in this rally.
+
+Oscillator: The RSI indicator still shows wide bearish divergence from this past week’s high, as did the slow stochastics. This signals upside momentum has waned near -term. We’ll look for a major cycle low with the RSI indicator in the 40 -60 range, ideally this week. It’s still crucial that the RSI indicator hits overbought (above 70) during this broader rally to confirm momentum has flipped back bullish.
+
+Solar-lunar studies from 1930 by MMTA graduate student Yating Hu. We will now give values for full reversal, as well as highs and lows.
+
+Lunar cycles for the next two weeks are as follows: Anything above 113 means there is a higher-thanexpected probability of a reversal from an isolated high or low. The more *, the more likely a reversal. The more #, the less likely a reversal. If it states, "often a high" or "often a low," it means that a high or a low has occurred about twice as often as a high or a low in the past. However, if the value has an asterisk next to it, it should be looked upon more as a reversal, whether historically it has been more often a high or a
+
+<!-- PAGE 4 END -->
+
+low. Other figures to the right indicate reversal periods that deserve attention, as shown by the recent studies by MMTA student Yating Hu.
+
+Reversal 3% High Low May 1-2 99.7 120.8* 78.3 May 3-5 75.3 85.3 65.1 May 6-7 67.3 66.7 67.9 May 8-10 107.4 111.6 103.2 May 11-12 113.6 107.3 120.1* May 13-14 114.4* 144.3* 84.0 May 15-16 129.9* 139.5* 120.1* May 17-18 86.6 75.1 98.3 May 19-20 142.0* 114.7* 169.8*
+
+Strategy: Position traders are long with a stop loss on a daily close below 47,909 now. Traders were advised, “Let’s cover 1/3 on a rally to 50,000 +/- 60 if offered.” Got this off for an excellent first profit. Aggressive traders were long 2/3 with a stop on a daily close below 47,909 and advised, “Let’s cover another 1/3 on a rally to 50,000 +/- 60 if offered.” Got this off for another excellent profit. Let’s buy back on a drop to 48,850 +/- 60, same stop loss. Very aggressive traders were long 1/3 with a stop on a daily close below 47,909, now after covering 2/3 for an excellent first profit. Traders were advised, “ Let’s buy back at current price levels, same stop loss.” We’re fully long again. Let’s cover 1/3 at current price levels.
+
+ESM (Jun S&P e-mini) by Gianni Di Poce, MMA Analyst.
+
+Last week's close was bullish. The close was above the weekly trend indicator point (TIP) for the 4th consecutive week, which means it remains in a trend run up.
+
+This week's trend indicator point (TIP) is 7142. It will be downgraded back to neutral if it closes below there this week.
+
+Weekly support is 7159.25-7173.25. A close below this range would be bearish, whereas a trade below and a close back above is a bullish trigger.
+
+Weekly resistance is 7328.75-7342.75. A close above this range would be bullish , whereas a trade above and a close back below is a bearish trigger.
+
+Bullish crossover zones are in effect at 5747.25 -5853.75, 4684.50 -4698.25, 4459.25 -4460.50, 4221.75-4252, 3742.50-3817, 2588.25-2617.50, 2206.75-2219.25, 1661.25-1663, 1405.50-1418, 1381.751382.75, 1263-1263.25, 1184.25-1196.75, 889.55-902.40, and 791.10-791.25.
+
+Prices previously closed above bearish crossover zones at 5459.75-5537.75, 4562-4566.25, 4439.504472.50, 4016.75-4051, 3375.50-3404.75, and 3180.50-3312.75, so these are support.
+
+Preferred primary cycle labeling: This week begins the 5th week in the primary cycle, measured from the March 31 low at 6353.25. The low occurred 19 weeks from the November 21 low at 6525, and in the regular 15-23 week window for a low to occur. It was also in the orb of the April 3-6 CRD.
+
+<!-- PAGE 5 END -->
+
+The S&P even begins the 5 th week of a new and still bullish 50 -week cycle. This is the first primary cycle phase within this new 50-week cycle, so a rally beyond Tuesday of the 9 th week is anticipated. This is because the first phase of the cycle tends to be bullish. Additionally, 50 -week cycles typically have exhibited 8-week rallies at the least, so the odds of a rally into late-May or early-June remain strong.
+
+The primary cycle is made up of phases that include major cycles lasting 5-8 weeks and half-primary cycles lasting 8-12 weeks. We’re on the verge of more clarity when it comes to the phase breakdown, as a major cycle crest is anticipated at any time in the S&P. It may have even happened on May 1 at 7300.75, which would’ve been in the orb of the May 5 CRD. It could keep rallying this week, though, but is still due for a 3-8 day corrective decline at any time.
+
+Alternate primary cycle labeling: There is none anymore.
+
+Geocosmics: Please read the commentary for this section in the DJIA analysis. The analysis there is precisely the same for the S&P now.
+
+Price targets and technicals: The S&P rallied to yet another new all-time high, further reinforcing the trend in favor of the bulls. It even broke out from a broadening wedge formation, which is a powerful momentum pattern and points to a rally as high as 7650-7700. Plenty of time remains in this primary cycle for this upside objective to be achieved.
+
+Despite the new all-time high, there are signs that upside momentum is waning. This is evidenced by the case of bearish divergence in price from the RSI indicator. Although the S&P is due for a pause and corrective pullback, the path of least resistance r emains higher as long as it holds above 7050 -7150. In fact, this would be the ideal price zone for a major cycle trough. If that were to break, it could fall as low as 6875 +/- 50, but that’s not very likely so early in the primary cycle. Now we’ll look to see the RSI indicator fall into the 40-60 corrective range for a major cycle low too.
+
+<!-- PAGE 6 END -->
+
+Strategy: Position traders are long with a stop loss on a daily close below 6863 now, after covering 1/3 for an excellent profit already. Let’s cover another 1/3 on a rally to 7500 +/- 12 if offered. Aggressive traders are long with a stop loss on a daily close below 6863 after covering 1/3 for an excellent profit already. Traders were advised, “Let’s cover another 1/3 on a rally to 7300 +/- 12 if offered.” Got this off for another excellent profit right at the high of the week. Let’s look to buy back on a drop to 7160 +/- 12 if offered, same stop loss. VAG traders were long 1/3 with a stop loss on a daily close below 6823 after covering 2/3 for an excellent profit already. Traders were advised, “Let’s cover all on a rally to 7245 +/- 12 if offered and stand aside.” Got this off for a final excellent profit. Let’s look to buy back on a drop to 7160 +/ - 12 if offered, with a stop loss on a close below 6863 if offered.
+
+NQM (June e-mini-NASDAQ) by Pouyan Zolfagharnia, MMA Analyst.
+
+Last week's close was mostly bullish, closing into the weekly resistance zone. T he close was above the TIP for the 4th consecutive week, maintaining the trend run up.
+
+This week's TIP is 26,975. It will be downgraded back to neutral with a close below here this week.
+
+Weekly support is 27,223-27,330. A close below this range would be bearish, whereas a trade below and a close back above is a bullish trigger.
+
+Weekly resistance is 28,130-28,237. A close above this range would be bullish, whereas a trade above and a close back below is a bearish trigger.
+
+Bullish crossover zones remain in effect at 25,837-25,851, 20,430-20,824, 16,448.50-16,499.50, 16,190-16,194, 14,674.25-14,723.50, 13,670.25-13,711.25, 12,042.25-12,149, 11,280-11,345, 5711-5745, 5482-5516.50, 5259-5275, 5085.75-5093.50, and 4410-4418.
+
+Prices closed above previous bearish crossover zones at 18,812 -18,818, 16,817 -16,906, 16,108 16,197, 15,189-15,253, 12,955-13,084, 9073.50-9325.25, 6372-6489.50, 4747-4756, 4437-4540.25, 44104419, and 4176-4178. These are all support zones now.
+
+Preferred primary cycle labeling: We are commencing week 5 of a new 15-23-week primary cycle measured off the March 31 low of 22,962. This low was also a 50-week cycle bottom as confirmed by the stellar rise to new ATHs.
+
+Major cycles in the NASDAQ form between weeks 5-8 in a classical three-phase cycle and 8-12 weeks in a two-phase cycle. Being that we are early in a new primary cycle, it is too early to tell what the phase breakdown will be, but we are in the timeframe for a major cycle crest to form if it’s going to. From there, we should see a 3-8 day correction.
+
+We now have our first confirmation of a bullish cycle, having taken out the crest of the prior cycle. Whilst we are in the early bullish phase of the cycle, as we approach the May 5 CRD, we could see the formation of the first major cycle crest. We are starting t o see bearish oscillator divergence build in the CCI, but we need to see it point down and form a crest as confirmation.
+
+Alternate primary cycle labeling: There is none.
+
+<!-- PAGE 7 END -->
+
+Geocosmics: The NASDAQ has broken out to new all -time highs , which is consistent with the Venus/Uranus conjunction of April 23. It is not unusual to see a breakout under a Uranus transit last up to 8 trading days before a pullback. Thus, we may see the first major cycle form this week, with the transit of the moon through Sagittarius to Capricorn in the first half of the week. This would correspond nicely with the May 5 one-star CRD now in effect this week.
+
+Price Targets and Technicals: The next 50-week MCP price target is 32,900 +/- 1,940, and the annual resistance zone is at 29,070. I am also expecting resistance at the ascending trendline, which joins all the crests from August 2022 to date. This is currently situated at 28,500 +/ - 100 and rising. If a major cycle crest forms near the ascending trend line, the pullback may be mild, retesting the prior ATH at 26,600 +/100 or the 17-day moving average in the coming weeks.
+
+Strategy: Position traders are long 2/3 with a stop-loss on a weekly close below 24,700. Look to reload and go fully long at 26,024 +/- 100. Aggressive traders are now flat, having covered all longs for great profits. Look to go long again on a decline to 26,600 +/- 100 with a stop-loss below 26,350 for now. Very aggressive traders are short with a stop -loss on a weekly close above 27,905. Cover 2/3 at 26,900 +/- 100 and the remainder at 26,700 +/- 100. Then go long at 26,600 +/- 100 with a stop-loss below 26,000.
+
+## ANNOUNCEMENTS & EVENTS
+
+## ANNOUNCEMENTS
+
+NOTE 1: JUST OVER TWO WEEKS TO GO!!! THE MMA 2026 TRADING AND INVESTMENT RETREAT WILL TAKE PLACE MAY 20 –24, 2026, AT THE RIKLI BALANCE HOTEL IN BLED, SLOVENIA, OVERLOOKING THE STUNNING LAKE BLED IN THE JULIAN ALPS. And yes, it will be offered online as well for those who
+
+<!-- PAGE 8 END -->
+
+cannot be in Bled at that time (SEE BELOW FOR NEW REDUCED RATES FOR ONLINE ATTENDEES ONLY!!!).
+
+This special four-day retreat will focus on trading strategies for position and short-term traders in 2026. It will cover the unique, research -based MMA methods for identifying primary, half -primary, major, and trading cycles. It will then apply those mark et-timing techniques (cycles and geocosmic studies) to the current situation in the stock markets, Gold, Silver, Bitcoin, currencies, interest rates, and grain markets, with strategies for each on both a short - and intermediate-term basis (one week to 12 m onths ahead). This retreat will also cover the setup and steps to take for applying MMA’s solar/lunar reversal dates for very short-term aggressive trades in Bitcoin, stock indices, and precious metals.
+
+There will also be special presentations and interactive discussions on current and future world conditions through 2032 that are likely to affect financial markets. These sessions will be led by world-class mundane astrologers Claude Weiss (Switzerland), Christeen Skinner (UK), Christof Niederwieser (Germany), Pouyan Zolfagharnia (UK), and Raymond Merriman (USA). Joining them on MMA timing methodology and trading strategies will be MMTA Director Wiebke Held (Germany) and MMA analysts Wyatt Fellows (USA), U lric Aspegrén (Switzerland), Gianni Di Poce (USA), and MMA Trading Coach Rita Perea (USA).
+
+For the schedule, registration, speaker bios, topic descriptions, hotel information, and the booking code, please click here. For a trailer video of what to expect, click here. Please note that all 45 rooms reserved for MMA at the Rikli Balance Hotel are currently booked. In fact, 50 have now been booked, as the hotel continues to open up new rooms from our waiting list. We have a list of other hotels within walking distance and will continue working with the Rikli Balance as more rooms are added. If you find that rooms at the Rikli Balance are filled, you can book a room at another hotel and cancel it within 72 hours of arrival if a room becomes available at the Rikli Balance (a high probability).
+
+The MMA Annual Investment and Traders’ Retreat is an incredible event! Don’t miss it if you can make it!
+
+NOTE 2: REDUCED RATES for online attendees at the May 20 –24 MMA Traders Retreat have just been announced. For those who cannot be present at Lake Bled for the Retreat, the cost to attend online will be $300 less ($3600 instead of $3900). In addition to viewing the live presentations, recordings of each day’s presentations will be uploaded and made available with PowerPoint slides within 24 hours.
+
+NOTE 3: THE SECOND EDITION OF THE NEW MMA MONTHLY CRYPTO REPORT WILL BE ISSUED THIS WEEK, ON WEDNESDAY, MAY 6!!! Each report will feature a cyclical and macro overview by Gianni Di Poce on Bitcoin, Ethereum, Solana, XRP, and one additional cryptocurrency selected based on current market interest, beginning with Cardano. Pouyan Zolfagharnia will then provide a geocosm ic overview and explain how it ties into the cycles. Together, they will share strategies for both position and shorter term trading in cryptocurrencies. CLICK HERE to subscribe to this new report.
+
+Click here for a short AI video on this new Crypto Report.
+
+NOTE 4: THE RECORDING OF THE FREE CRYPTO WEBINAR, HELD ON APRIL 8, IS NOW AVAILABLE!!! Click here to watch it on YouTube. Are you new to the Crypto world? Do you wonder how to trade cryptocurrency via wallets, futures, or ETFs? These and other topics are covered in this special instructional webinar on the new MMA Monthly Crypto Report. This FREE WEBINAR explains how to use the new monthly Crypto report for maximum value. Ray Merriman hosted this webinar, joined by Gianni Di Poce, Pouyan Zolfagharnia, and MMA President Wyatt Fellows.
+
+NOTE 5: WE HAVE JUST COMPLETED A NEW UPGRADE FOR THE FAR FOR GALACTIC TRADER SOFTWARE
+
+<!-- PAGE 9 END -->
+
+PROGRAM!!! We can now conduct solar/lunar weighted value studies for any market by isolating or omitting any planet that is retrograde! For instance, we can now compare solar/lunar values for any market when Mercury (or Venus, Mars, or any planet) is retrograde or di rect, or both. This is important because we have noticed that when Mercury is retrograde, the lunar values for Bitcoin perform differently in many cases than when Mercury is direct. If you don’t own the FAR for the Galactic Trader program, which is key to conducting MMA research studies to identify turning points in any financial market, and you wish to know more about it, please click here. The cost is $1895 (end -of-day version) and includes Jeanne Long’s Galactic Trader software, featuring extensive W. D. Gann trading tools that she created.
+
+NOTE 6: RECORDINGS OF MMA’S SPECIAL SIX-WEEK COURSE ON “THE BASIC PRINCIPLES OF GEOCOSMIC STUDIES FOR FINANCIAL MARKET TIMING” ARE NOW AVAILABLE!!! Led by Gianni Di Poce and supported by Ray Merriman, this course is designed to teach students the basic principles of planets, signs, and aspects (including retrograde and direct stations) as used in MMA’s market-timing methodology — one of its most important tools. The course explains which planets and signs rule the various sectors of the economy and financial markets. In addition, it covers how to use an ephemeris and astrological software (Solar Fire) for important routines such as calculating charts, generating transit “hit lists,” and identifying signs, ingresses, planetary stations, and aspects — the essential cosmic features necessary for determining market reversal periods.
+
+The course is especially useful for those interested in taking the two -year program offered by the Merriman Market Timing Academy or for anyone wishing to deepen their astrological knowledge. The cost for these six introductory lessons, each lasting about two hours, is $300. This is a great opportunity to learn basic astrology from an excellent economic astrologer! Click here to order now!
+
+NOTE 7: THE JUPITER REPORT: YOUR MOMENTS OF OPPORTUNITY ! The Jupiter Report is written by Raymond Merriman. It is a 30 - to 40-page report that all traders (and even non -traders) will find highly valuable. It identifies the times during the year when Jupiter transits are highlighted in your natal chart and explains the meaning of Jupiter’s transits to your natal planets and angles over a 14 -month period (including one month before your order date and one month after the year ends). As an added bonus, each transit is ranked on a scale from –3 to +3 in terms of favorability for trading. Traders may find this especially valuable! Would you like to know if you are under a +3 transit and therefore most likely to experience trading success? Or a –3 transit, with a stronger -than-usual potential for misjudgments that can be costly? The price for a personal 14-month Jupiter Report based on your birth data is $69.
+
+Coming soon! The Saturn Report: Mastering Your Life Cycles. Due out in late summer.
+
+NOTE 8: THE MMA SOLAR-LUNAR APP OFFERS REVERSAL SIGNALS FOR THE DJIA, NASDAQ, GOLD, AND SILVER. It is an ideal tool to have in your back pocket if you are a short-term swing trader looking for highprobability dates that identify isolated lows and highs in these markets. Please note that this should not be used as a standalone system. It works best as an adjunct tool when cycle lows or highs are due, when a market is in a technically overbought or oversold condition, or when it is exhibiting intermarket bullish or bearish divergence relative to a related market. The app is currently available only o n Apple devices (iPhone and iPad). To learn more about the MMA app, click here. To order, go to the Apple App Store and search for Merriman Solar/Lunar Reversals.
+
+## NOTE 9: THE NEW AUDIOBOOK OF EVOLUTIONARY ASTROLOGY: THE JOURNEY OF THE SOUL THROUGH
+
+STATES OF CONSCIOUSNESS, by Raymond Merriman, written in 1993, is now available! It is narrated by Thomas Miller, who has a great voice and also broadcasts MMA’s free weekly column. The first edition of Evolutionary Astrology, originally published in 1977, introduced this remarkable subject to the astrological
+
+<!-- PAGE 10 END -->
+
+community, where it has since become one of astrology’s major branches of study. Get ready to listen to the original work on Evolutionary Astrology that brought a spiritual perspective to the study of astrology from the late 1970s through today. To order the book (hardcover or eBook) or the audio recording, please click here.
+
+NOTE 10: For a look at MMA’s newest advances in AI, click here. New short videos are now available — click here to watch.
+
+## EVENTS
+
+MAY 20–24, 2026: MMA’S NEXT INVESTMENT RETREAT, LAKE BLED, SLOVENIA. Registration is now open. The presentations will also be available via Zoom for those unable to attend in person. The theme of this event will focus on market timing and trading, including how to calculate and use solar/lunar reversal cycles. But there will also be coverage of longer -term cycles, with strategies for all! It’s going to be great!
+
+JUNE 20, 2026: MMA’S ANNUAL MID-YEAR MARKETS UPDATE WEBINAR. Save the date! Note that the date has been moved up one day to Saturday, June 20, at 1 PM EDT. Registration details will be released soon.
+
+## SEPTEMBER 3, 2026: A UAC PRE -CONFERENCE WORKSHOP ON FINANCIAL ASTROLOGY BY RAYMOND
+
+MERRIMAN, 1:00–5:00 PM. This workshop will take place at the United Astrology Congress (UAC), the largest astrological conference in the world, which is held every four to eight years. More than 150 worldclass astrologers will be presenting, and over 1500 attendees will be present. The conference will be held at the Marriott Downtown Chicago Magnificent Mile Hotel. In addition to the workshop, Ray will present another lecture during the six-day event on mundane astrology, titled “What Is Happening in the World from an Astrological Viewpoint,” on September 5. For more information, visit www.uacastrology.com.
+
+Disclaimer and proper use of this information: Futures and options trading involve the risk of large losses as well as large gains.
+
+Information is provided herein with sincere intent and according to MMA's original research studies and methodologies. These reports are provided mainly for "speculators." By its very nature, "speculation" means "willing to take the risk of loss." "Speculators" must be willing to accept the fact that they are going to have losing trades, many more than, say, "investors." That is why they are "speculators." The way "speculators" become profitable is not so much by a high percentage of winning trades but by controlling the amount of loss on any given trade, so the average trade on winners is considerably more than the average trade on losing trades.
+
+MMA's comments, strategies, and data are provided as guidelines for traders each day and/or week. Comments and strategies are based upon intraday and intraweek highs, lows, and closes at the end of the day or week. Traders are advised to use these only as guidelines - and use intraday analysis to establish positions in the directions of comments given, so long as those support/resistance (entrance) areas. Looks favorable according to intraday analysis as well. Support and resistance are areas for day traders to look to buy and sell intraday. No guarantees are made for accuracy.
+
+<!-- PAGE 11 END -->
+
+Support may represent favorable risk/reward places to buy if the trend is up. If prices trade below support, then have a close back above; it is considered a bullish "trigger" and oftentimes represents a good buy signal. Resistance may represent favorable risk/reward places to go short if the trend is down. If prices trade above it, then have a weekly close back below; it is considered a bearish "trigger" and oftentimes is a good sell signal.
+
+By signing up for these reports, the reader agrees that he/she is solely responsible for any actions taken in markets, and neither the author, publisher, analyst , or any person associated with MMA assumes any responsibility whatsoever for the reader's decisions.
+
+<!-- PAGE 12 END -->
