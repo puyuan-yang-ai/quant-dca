@@ -1,7 +1,6 @@
 pyyaml>=6.0
 matplotlib>=3.5.0
 lightweight-charts>=2.1
-PyGObject<3.50
 yfinance>=0.2.0
 pandas>=1.5.0
 

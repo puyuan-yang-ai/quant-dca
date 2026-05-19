@@ -12,6 +12,11 @@ venv/
 .venv/
 env/
 
+# Secrets / API keys
+.env
+.env.local
+*.key
+
 # IDE
 .vscode/
 .idea/
@@ -24,7 +29,7 @@ Thumbs.db
 
 # Cursor / SpecStory
 # .specstory/
-.cursor/
+# .cursor/
 
 # Jupyter
 .ipynb_checkpoints/

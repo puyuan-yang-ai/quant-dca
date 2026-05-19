@@ -2,7 +2,7 @@
 title: MMA Weekly Report Prompts
 description: 基于 MMA（Market Mood Analysis）周报的完整 AI 辅助交易决策提示词集合，涵盖从周报解读、策略制定、每日剧本校验到期权下单的全流程。
 author: puyuyang
-version: 1.0
+version: 1.1
 last_updated: 2026-05-18
 target_asset: SPY 期权（两腿 Spread）
 platform: 老虎证券（Tiger Brokers）
@@ -10,37 +10,46 @@ platform: 老虎证券（Tiger Brokers）
 workflow:
   - step: 1
     prompt: Prompt 1
+    slash_command: /mma-1-analyze <周报 MD 文档的绝对路径>
     trigger: 每周初，收到 MMA 周报后触发一次
-    input: MMA 周报原文（粘贴至对话）
+    input: 周报 MD 文档的绝对路径（必填，未传则停止并提示）
     output:
-      - YYYYMMDD_analysis_report.md（市场分析报告，含关键点位、市场阶段、占星周期解读）
-      - YYYYMMDD_scenario_evolution.md（剧本推演文件，含主剧本和所有备选剧本，后续每日更新）
+      - YYYYMMDD_analysis_report.md（市场分析报告，落盘至周报所在目录）
+      - YYYYMMDD_scenario_evolution.md（剧本推演文件，落盘至周报所在目录，后续每日更新）
+    note: YYYYMMDD 由 AI 从周报内容中自动提取
 
   - step: 2
     prompt: Prompt 2
-    trigger: Prompt 1 完成后，紧接着触发一次
-    input: Prompt 1 的分析结论（已在对话上下文中）
+    slash_command: /mma-2-strategy
+    trigger: Prompt 1 完成后，紧接着在同一会话内触发
+    input: 自动使用当前会话上下文中 Prompt 1 的输出（若上下文不存在则停止并提示）
     output:
-      - YYYYMMDD_execution_plan.md（交易执行计划，含策略、操盘方案、综合评估）
+      - YYYYMMDD_execution_plan.md（交易执行计划，落盘至与 Prompt 1 输出同一目录）
 
   - step: 3
-    prompt: Prompt 4
-    trigger: Prompt 2 完成后触发（也可在每日盘前按需重复触发）
-    input: 当前最新的市场判断（来自 Prompt 2 或当日 Prompt 3 的结论）
-    output: SPY Spread 期权订单参数清单（直接用于老虎证券组合单下单）
+    prompt: Prompt 3
+    slash_command: /mma-3-verify <scenario_evolution.md 的绝对路径>
+    trigger: 每个交易日盘前手动触发，可多次触发，可在新会话中独立使用
+    input: scenario_evolution.md 的绝对路径（必填，未传则停止并提示）
+    output:
+      - 直接修改 scenario_evolution.md（追加今日校验记录和状态，保留历史）
+      - 对话中输出剧本状态报告（✅ / ⚠️ / ❌）+ 今日行动建议
+    note: 今日日期由 AI 自动取系统日期，无需用户传入
 
   - step: 4
-    prompt: Prompt 3
-    trigger: 每个交易日盘前手动触发，可多次触发
-    input: 无需额外输入（AI 自动拉取 Yahoo Finance 最新数据）
+    prompt: Prompt 4
+    slash_command: /mma-4-order <scenario_evolution.md 的绝对路径>
+    trigger: 可随时手动触发（周初、每日盘前、盘中均可，可多次触发），可在新会话中独立使用
+    input: scenario_evolution.md 的绝对路径（必填，未传则停止并提示）
     output:
-      - 更新 YYYYMMDD_scenario_evolution.md（追加当日校验状态，不覆盖历史记录）
-      - 今日剧本状态报告（✅ / ⚠️ / ❌）+ 今日行动建议
+      - YYYYMMDD_HHMM_orders.md（订单参数文件，落盘至 scenario_evolution.md 所在目录，每次触发独立新文件）
+    note: 若主剧本状态为 ❌ 已失效，不生成订单参数，不落盘
 
-notes:
-  - 所有落盘文件的日期统一使用**周报发布日期**，不使用触发当天日期
-  - Prompt 3 和 Prompt 4 可在每日盘前按需组合触发：先校验剧本（Prompt 3），再更新订单参数（Prompt 4）
+rules:
+  - 带参数的命令（1/3/4）若未传入参数，AI 立即停止执行并提示用户补传，禁止猜测、禁止默认值、禁止继续执行
+  - Prompt 1 和 Prompt 2 设计为同一会话内连用，Prompt 3 和 Prompt 4 设计为独立会话也可触发
   - YYYYMMDD_scenario_evolution.md 是核心追踪文件，记录整周剧本演变的完整历史
+  - 所有落盘文件路径必须与对应的输入参数文件保持在同一目录
 ---
 
 ## Prompt 1：解读市场分析文档
@@ -198,15 +207,18 @@ notes:
 
 ## Prompt 4：生成 SPY 期权订单参数
 
-基于当前最新的市场判断（来自 Prompt 2 的策略计划或 Prompt 3 的最新剧本状态），生成可在老虎证券（Tiger Brokers）直接执行的 SPY 期权组合单订单参数。
+> **使用前置步骤**：请将本周最新的 `YYYYMMDD_scenario_evolution.md` 文件内容完整粘贴至对话中，再触发此 Prompt。AI 将以该文件中**最新的剧本状态**（最后一次 ✅ / ⚠️ / ❌ 校验结果）作为唯一判断依据生成订单参数。
+
+请基于上方粘贴的 `YYYYMMDD_scenario_evolution.md` 中最新的剧本状态，生成可在老虎证券（Tiger Brokers）直接执行的 SPY 期权组合单订单参数。
 
 ### 要求
 
 - 标的：SPY（SPDR S&P 500 ETF）
-- 策略：两腿 Spread 期权组合单，由 AI 根据当前方向判断选择合适的 Spread 类型：
+- 策略：两腿 Spread 期权组合单，由 AI 根据当前剧本方向判断选择合适的 Spread 类型：
   - 看多：Bull Call Spread 或 Bull Put Spread
   - 看空：Bear Put Spread 或 Bear Call Spread
 - 不做四腿及以上的复杂结构
+- 若当前主剧本状态为 ❌ 已失效，请明确说明，不生成订单参数，等待新的剧本判断
 
 ### 输出格式
 
