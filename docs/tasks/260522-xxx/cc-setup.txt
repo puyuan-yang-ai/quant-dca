@@ -1,0 +1,247 @@
+Table of Contents
+
+
+
+Subpages
+ 
+
+
+Claude Code is approved for use at AMD by RAI, and Legal
+
+You need to follow the below steps to ensure you do not leak AMD data
+
+Have you considered using GENIE by the AMD CAD team instead? GENIE is a wrapper around Claude Code that provides configuration setup and a lot of extra features for AMDers out of the box.
+
+Have more questions about Claude Code?
+
+Quickstart: 
+https://code.claude.com/docs/en/quickstart 
+
+All settings: 
+https://code.claude.com/docs/en/settings 
+
+All environment variables: 
+https://code.claude.com/docs/en/env-vars 
+
+Background
+This guide describes how to run Claude Code using AMD’s LLM Gateway (you must use this at AMD). Big thanks to Conor Donohue for the original steps.
+
+You must have an LLM API Gateway Key, or request one through llm.amd.com.
+
+Instructions
+1. Install Claude Code
+macOS, Linux, WSL:
+
+
+
+curl -fsSL https://claude.ai/install.sh | bash -s stable
+Windows PowerShell:
+
+
+
+& ([scriptblock]::Create((irm https://claude.ai/install.ps1))) stable
+Native Windows installs require Git for Windows.
+
+2. Add claude to your PATH
+If claude --version already works, skip this step.
+
+bash / zsh (~/.bashrc or ~/.zshrc):
+
+
+
+export PATH="$HOME/.local/bin:$PATH"
+csh / tcsh (~/.cshrc):
+
+
+
+setenv PATH "$HOME/.local/bin:$PATH"
+Windows PowerShell (one-time, persistent):
+
+
+
+[Environment]::SetEnvironmentVariable("PATH", "$env:USERPROFILE\.local\bin;$env:PATH", "User")
+3. Create your settings file
+Linux / Mac path: ~/.claude/settings.json  ·  Windows path: %USERPROFILE%\.claude\settings.json
+
+Replace PASTE YOUR ACTUAL KEY INSIDE QUOTES with the LLM Gateway key from llm.amd.com.
+
+
+
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "ANTHROPIC_API_KEY": "dummy",
+    "ANTHROPIC_BASE_URL": "https://llm-api.amd.com/Anthropic",
+    "ANTHROPIC_CUSTOM_HEADERS": "Ocp-Apim-Subscription-Key: PASTE YOUR ACTUAL KEY INSIDE QUOTES\nuser:UPDATE_ME",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-4.5",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-4.6[1m]",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4.7[1m]",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+    "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA": "1",
+    "OTEL_METRICS_EXPORTER": "otlp",
+    "OTEL_LOGS_EXPORTER": "otlp",
+    "OTEL_TRACES_EXPORTER": "otlp",
+    "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
+    "OTEL_EXPORTER_OTLP_ENDPOINT": "https://collector.slug.amd.com",
+    "OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE": "cumulative",
+    "OTEL_RESOURCE_ATTRIBUTES": "deployment.environment=production,service.namespace=genai,user.name=UPDATE_ME",
+    "OTEL_LOG_USER_PROMPTS": "0",
+    "OTEL_LOG_TOOL_DETAILS": "0",
+    "OTEL_LOG_TOOL_CONTENT": "0",
+    "OTEL_LOG_RAW_API_BODIES": "0",
+    "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS": "1",
+    "ENABLE_TOOL_SEARCH": "true"
+  }
+}
+Linux / Mac only: lock down the directory to your user before pasting your key:
+
+
+
+mkdir -p ~/.claude && chmod 700 ~/.claude
+4. Launch Claude Code
+
+
+claude
+More info on CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC
+
+FAQ
+Q: I see “Select login method:” when I start Claude Code
+Add the following to ~/.claude.json (Linux/Mac) or %USERPROFILE%\.claude.json (Windows). This is the file ~/.claude.json at the root of your home directory — not ~/.claude/.claude.json inside the .claude folder.
+
+
+
+{
+  "customApiKeyResponses": { "approved": ["dummy"], "rejected": [] }
+}
+This skips the “Trust API Key” prompt on first launch. You’ll still get the one-time theme-selection question, then Claude Code will start normally.
+
+apiKeyHelper, hasCompletedOnboarding, and CLAUDE_CONFIG_DIR are sometimes suggested for this — they work in some scenarios but break when you use --setting-sources project or relocate your config. Use customApiKeyResponses unless you need CLAUDE_CONFIG_DIR for its real purpose (relocating the entire config dir, e.g. when /home is full).
+
+Thanks to Christian DeAngelis for the cleaner guidance here.
+
+Q: How do I update to a newer version of Claude Code?
+
+
+# Latest stable (recommended)
+claude install stable
+# Latest (could be unstable)
+claude install latest
+# Specific version
+claude install x.y.z
+Native installs auto-update in the background. Pin to stable in settings.json if you want fewer surprises:
+
+
+
+{ "autoUpdatesChannel": "stable" }
+Q: How do I use Claude Code’s VS Code extension?
+See: http://u.amd.com/ccvsc
+
+Q: How do I reuse other agent rule or AGENTS.md files?
+Reference them with @ from your ~/.claude/CLAUDE.md:
+
+
+
+General rules:
+@/proj/some/path/AGENTS.md
+When working with files refer to this rule:
+@/proj/some/path/.cline/Rules/file_handling.md
+When working with git/github/gh refer to this rule:
+@/proj/some/path/.cline/Rules/git-workflow.md
+When working with python refer to this rule:
+@/proj/some/path/.cline/Rules/python-coding.md
+When working with rust refer to this rule:
+@/proj/some/path/.cline/Rules/rust-general.md
+When making slides refer to this rule:
+@/proj/some/path/.cline/Rules/slide-prep.md
+Watch for native AGENTS.md support: https://github.com/anthropics/claude-code/issues/6235
+
+Q: How do I add the SLAI Marketplace?
+Anthropic plugin docs: https://code.claude.com/docs/en/discover-plugins
+
+Without a GitHub EMU account (Linux / macOS)
+
+
+uvx --index https://atlartifactory.amd.com:8443/artifactory/api/pypi/SW-SLAI-PROD-LOCAL/simple slai-marketplace list
+uvx --index https://atlartifactory.amd.com:8443/artifactory/api/pypi/SW-SLAI-PROD-LOCAL/simple slai-marketplace install <name>
+Without a GitHub EMU account (Windows)
+
+
+Invoke-WebRequest -Uri "https://atlartifactory.amd.com:8443/artifactory/SW-SLAI-PROD-LOCAL/slai-marketplace/windows/slai-marketplace-latest.exe" -OutFile slai-marketplace.exe
+.\slai-marketplace.exe list
+.\slai-marketplace.exe install <name>
+With a GitHub EMU account — directly from inside Claude Code
+
+
+/plugin marketplace add AMD-SLAI/SLAI.Marketplace
+/plugin                                           # then type "slai-marketplace" to filter
+/plugin install plugin-name@slai-marketplace
+/plugin marketplace update marketplace-name       # refresh
+Q: How do I set up a status line?
+Inside Claude Code:
+
+Linux / macOS
+
+
+/statusline I am using Linux (RHEL8). This needs to be set up globally. Please use a separate .sh file for the script.
+/statusline the current statusline could use some improvements - what other information can you display?
+Windows
+
+
+/statusline I am using Windows. This needs to be set up globally. Please use a separate .ps1 file for the script.
+/statusline the current statusline could use some improvements - what other information can you display?
+Q: How do I enable agent teams?
+Latest docs: https://code.claude.com/docs/en/agent-teams
+
+Add to the env block in settings.json:
+
+
+
+"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+If you’re on Linux, WSL, or macOS and use tmux, also add this top-level key (outside env) for a richer agent-team view:
+
+
+
+"teammateMode": "tmux"
+With tmux enabled your view will look something like…
+
+image-20260219-070134.png
+Q: My requests time out on long agent runs or slow links
+Claude Code’s default API timeout is 10 minutes. Raise it in env:
+
+
+
+"API_TIMEOUT_MS": "1200000",
+"CLAUDE_CODE_MAX_RETRIES": "20"
+Q: TLS errors against llm-api.amd.com (“self-signed certificate”, “unable to verify the first certificate”, SELF_SIGNED_CERT_IN_CHAIN, CERT_HAS_EXPIRED)
+The Node.js runtime Claude Code uses doesn’t read the OS trust store, so even on a managed AMD workstation you can hit these errors. Fix is two parts: (1) make sure the AMD root CA is trusted by your OS, then (2) point Claude Code at it via NODE_EXTRA_CA_CERTS.
+
+These are the same steps used for GitHub Copilot — refer there for the canonical version.
+
+Step 1: Download the AMD root certificate
+Pick one source:
+
+AMD_CA.crt (Confluence attachment)
+
+AMD Corporate Root CA 2032.crt (Confluence attachment)
+
+Internal AMD PKI server: http://pki.amd.com/CertEnroll/
+
+Step 2: Install it system-wide
+RHEL / CentOS / Fedora:
+
+
+
+sudo cp AMD_CA.crt /etc/pki/ca-trust/source/anchors/
+sudo update-ca-trust
+Debian / Ubuntu:
+
+
+
+sudo cp AMD_CA.crt /usr/local/share/ca-certificates/
+sudo update-ca-certificates
+If curl https://llm-api.amd.com/Anthropic previously returned SSL certificate problem: self signed certificate in certificate chain and now returns an HTTP response (any status), the cert is trusted.
+
+If you have an expired AMD root cert lingering, find and remove .crt / .crt.puppet files in /usr/local/share/ca-certificates/ first, then re-run sudo update-ca-certificates.
+
+Windows:
