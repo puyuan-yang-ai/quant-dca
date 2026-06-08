@@ -14,9 +14,28 @@
 """
 import os
 import sys
+from pathlib import Path
 
 import pandas as pd
 import yfinance as yf
+
+
+def _load_proxy() -> str | None:
+    existing = os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY")
+    if existing:
+        return existing
+    env_file = Path(__file__).resolve().parent.parent / ".env"
+    if env_file.exists():
+        for line in env_file.read_text().splitlines():
+            line = line.strip()
+            if line.startswith("YAHOO_PROXY="):
+                return line.split("=", 1)[1].strip()
+    return None
+
+_PROXY = _load_proxy()
+if _PROXY:
+    os.environ.setdefault("HTTPS_PROXY", _PROXY)
+    os.environ.setdefault("HTTP_PROXY", _PROXY)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 

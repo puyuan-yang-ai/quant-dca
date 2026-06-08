@@ -19,10 +19,30 @@ S&P 500 Market Breadth 预计算脚本
 """
 import os
 import sys
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import requests
 import yfinance as yf
+
+
+def _load_proxy() -> str | None:
+    existing = os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY")
+    if existing:
+        return existing
+    env_file = Path(__file__).resolve().parent.parent / ".env"
+    if env_file.exists():
+        for line in env_file.read_text().splitlines():
+            line = line.strip()
+            if line.startswith("YAHOO_PROXY="):
+                return line.split("=", 1)[1].strip()
+    return None
+
+_PROXY = _load_proxy()
+if _PROXY:
+    os.environ.setdefault("HTTPS_PROXY", _PROXY)
+    os.environ.setdefault("HTTP_PROXY", _PROXY)
 
 # 项目根目录
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -34,12 +54,13 @@ SMA_WINDOW = 20
 
 def get_sp500_tickers():
     """从 Wikipedia 获取当前 S&P 500 成分股列表"""
-    import urllib.request
+    from io import StringIO
     url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
     print(f"正在从 Wikipedia 获取 S&P 500 成分股列表...")
-    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-    html = urllib.request.urlopen(req).read().decode('utf-8')
-    tables = pd.read_html(html)
+    # Wikipedia 封禁了代理数据中心 IP，直连即可（Wikipedia 在国内可正常访问）
+    resp = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=30)
+    resp.raise_for_status()
+    tables = pd.read_html(StringIO(resp.text))
     tickers = tables[0]['Symbol'].tolist()
     # 修正 Wikipedia 中的特殊字符（如 BRK.B → BRK-B）
     tickers = [t.replace('.', '-') for t in tickers]

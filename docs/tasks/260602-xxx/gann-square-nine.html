@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>江恩九方图工具</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --text: #172033;
+      --muted: #667085;
+      --border: #d9e0ec;
+      --primary: #2454d6;
+      --primary-soft: #e8efff;
+      --cardinal: #fff1d6;
+      --ordinal: #e7f8ec;
+      --center: #172033;
+      --near: #ffe4e8;
+      --shadow: 0 12px 32px rgba(18, 32, 53, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+      line-height: 1.5;
+    }
+
+    .page {
+      max-width: 1420px;
+      margin: 0 auto;
+      padding: 32px 24px 44px;
+    }
+
+    .hero {
+      margin-bottom: 24px;
+    }
+
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: 30px;
+      letter-spacing: -0.02em;
+    }
+
+    .hero p {
+      max-width: 860px;
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 320px minmax(460px, 1fr) 360px;
+      gap: 18px;
+      align-items: start;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+    }
+
+    .panel-header {
+      padding: 18px 20px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .panel-header h2 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .panel-header p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .controls {
+      display: grid;
+      gap: 14px;
+      padding: 18px 20px 20px;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+
+    label {
+      color: #344054;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    input,
+    select {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 11px;
+      color: var(--text);
+      background: #fff;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    input:focus,
+    select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(36, 84, 214, 0.14);
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .button-row {
+      display: grid;
+      gap: 10px;
+      margin-top: 6px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 16px;
+      color: #fff;
+      background: var(--primary);
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    button:hover {
+      box-shadow: 0 10px 18px rgba(36, 84, 214, 0.18);
+      transform: translateY(-1px);
+    }
+
+    .status {
+      min-height: 20px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .grid-wrap {
+      padding: 18px;
+      overflow: auto;
+    }
+
+    .square-grid {
+      display: grid;
+      gap: 5px;
+      min-width: max-content;
+    }
+
+    .cell {
+      position: relative;
+      display: grid;
+      min-width: 58px;
+      min-height: 52px;
+      padding: 7px 6px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #fff;
+      place-items: center;
+      text-align: center;
+    }
+
+    .cell .value {
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .cell .index {
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .cell.cardinal {
+      background: var(--cardinal);
+      border-color: #f3c46b;
+    }
+
+    .cell.ordinal {
+      background: var(--ordinal);
+      border-color: #8bd49f;
+    }
+
+    .cell.center {
+      background: var(--center);
+      border-color: var(--center);
+      color: #fff;
+    }
+
+    .cell.center .index {
+      color: rgba(255, 255, 255, 0.72);
+    }
+
+    .cell.near-current {
+      box-shadow: inset 0 0 0 2px #e54862;
+    }
+
+    .cell.near-current:not(.center) {
+      background: var(--near);
+    }
+
+    .cell.level-up {
+      box-shadow: inset 0 0 0 2px #2454d6;
+    }
+
+    .cell.level-down {
+      box-shadow: inset 0 0 0 2px #14713a;
+    }
+
+    .cell.level-up.near-current,
+    .cell.level-down.near-current {
+      box-shadow: inset 0 0 0 2px #e54862;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 0 18px 18px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .legend span {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .swatch {
+      width: 12px;
+      height: 12px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+    }
+
+    .swatch.center {
+      background: var(--center);
+    }
+
+    .swatch.cardinal {
+      background: var(--cardinal);
+      border-color: #f3c46b;
+    }
+
+    .swatch.ordinal {
+      background: var(--ordinal);
+      border-color: #8bd49f;
+    }
+
+    .swatch.near {
+      background: var(--near);
+      border-color: #e54862;
+    }
+
+    .swatch.level-up {
+      background: #fff;
+      border-color: #2454d6;
+      box-shadow: inset 0 0 0 2px #2454d6;
+    }
+
+    .swatch.level-down {
+      background: #fff;
+      border-color: #14713a;
+      box-shadow: inset 0 0 0 2px #14713a;
+    }
+
+    .levels {
+      padding: 0;
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--border);
+      background: #fbfcff;
+    }
+
+    .metric {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px;
+      background: #fff;
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 14px;
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th,
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    th:first-child,
+    td:first-child {
+      text-align: left;
+    }
+
+    th {
+      color: #344054;
+      background: #fbfcff;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    tr.near-row {
+      background: #fff2f4;
+    }
+
+    .tag {
+      display: inline-flex;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .tag.primary {
+      color: #8b4d00;
+      background: var(--cardinal);
+    }
+
+    .tag.secondary {
+      color: #14713a;
+      background: var(--ordinal);
+    }
+
+    .tag.near {
+      color: #b4233c;
+      background: #ffe4e8;
+    }
+
+    .tag.squaring {
+      color: #1f3aa6;
+      background: #e8efff;
+    }
+
+    .note {
+      margin-top: 18px;
+      padding: 16px 18px;
+      color: var(--muted);
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      font-size: 13px;
+    }
+
+    .error {
+      color: #b42318;
+    }
+
+    @media (max-width: 1180px) {
+      .layout {
+        grid-template-columns: 320px minmax(0, 1fr);
+      }
+
+      .levels-panel {
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .page {
+        padding: 22px 14px 32px;
+      }
+
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .hero h1 {
+        font-size: 24px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <h1>江恩九方图工具</h1>
+      <p>输入关键锚点和价格参数，点击“生成/更新”后生成螺旋九方图，并计算主要角度对应的潜在支撑、阻力和目标观察区。</p>
+    </section>
+
+    <section class="layout">
+      <aside class="panel">
+        <div class="panel-header">
+          <h2>参数设置</h2>
+          <p>第一版使用手动输入，不接入实时行情。</p>
+        </div>
+        <form id="settingsForm" class="controls">
+          <div class="field">
+            <label for="anchor">锚点价格</label>
+            <input id="anchor" name="anchor" type="number" min="0.000001" step="any" value="100" required>
+            <span class="hint">通常取重要高点、低点、开盘价或收盘价。</span>
+          </div>
+
+          <div class="field">
+            <label for="current">当前价格</label>
+            <input id="current" name="current" type="number" min="0.000001" step="any" value="108" required>
+          </div>
+
+          <div class="field">
+            <label for="step">步长 / 单位</label>
+            <input id="step" name="step" type="number" min="0.000001" step="any" value="1" required>
+            <span class="hint">影响方格价格间隔，可按品种波动率调整。</span>
+          </div>
+
+          <div class="field">
+            <label for="size">图表尺寸</label>
+            <select id="size" name="size">
+              <option value="9">9 x 9</option>
+              <option value="11" selected>11 x 11</option>
+              <option value="13">13 x 13</option>
+              <option value="15">15 x 15</option>
+              <option value="17">17 x 17</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="direction">投射方向</label>
+            <select id="direction" name="direction">
+              <option value="both" selected>上下都显示</option>
+              <option value="up">只看上方阻力</option>
+              <option value="down">只看下方支撑</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="precision">价格精度</label>
+            <select id="precision" name="precision">
+              <option value="0">0 位小数</option>
+              <option value="1">1 位小数</option>
+              <option value="2" selected>2 位小数</option>
+              <option value="3">3 位小数</option>
+              <option value="4">4 位小数</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="tolerance">接近容差（%）</label>
+            <input id="tolerance" name="tolerance" type="number" min="0" step="0.1" value="0.5" required>
+            <span class="hint">当前价进入该范围时标记为“接近”。</span>
+          </div>
+
+          <div class="button-row">
+            <button type="submit">生成/更新</button>
+            <span id="status" class="status" aria-live="polite"></span>
+          </div>
+        </form>
+      </aside>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>螺旋九方图</h2>
+          <p>中心为锚点价格，十字线和对角线代表经典观察方向。</p>
+        </div>
+        <div class="grid-wrap">
+          <div id="squareGrid" class="square-grid" aria-label="江恩九方图网格"></div>
+        </div>
+        <div class="legend">
+          <span><i class="swatch center"></i>中心</span>
+          <span><i class="swatch cardinal"></i>十字线</span>
+          <span><i class="swatch ordinal"></i>对角线</span>
+          <span><i class="swatch near"></i>接近当前价</span>
+          <span><i class="swatch level-up"></i>关键阻力位</span>
+          <span><i class="swatch level-down"></i>关键支撑位</span>
+        </div>
+      </section>
+
+      <section class="panel levels-panel">
+        <div class="panel-header">
+          <h2>关键价位</h2>
+          <p>以锚点为原点按平方根公式向外多圈展开；当前价用于定位最近支撑/阻力。档距随价位放大是江恩平方根的正常特性。</p>
+        </div>
+        <div class="levels">
+          <div id="summary" class="summary"></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>档位</th>
+                  <th>方向</th>
+                  <th>价位</th>
+                  <th>距离</th>
+                </tr>
+              </thead>
+              <tbody id="levelsBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <section class="note">
+      说明：江恩九方图用于识别潜在观察区，不能单独作为交易信号。实际交易仍需要结合趋势结构、K 线形态、成交量、均线、风险收益比等因素确认。
+    </section>
+  </main>
+
+  <script>
+    const form = document.getElementById("settingsForm");
+    const gridEl = document.getElementById("squareGrid");
+    const levelsBody = document.getElementById("levelsBody");
+    const summaryEl = document.getElementById("summary");
+    const statusEl = document.getElementById("status");
+
+    const BASE_RINGS = 3;
+    const MAX_RINGS = 30;
+    const COVER_RATIO = 0.15;
+
+    function readSettings() {
+      const fields = form.elements;
+
+      return {
+        anchor: Number(fields.anchor.value),
+        current: Number(fields.current.value),
+        step: Number(fields.step.value),
+        size: Number(fields.size.value),
+        direction: fields.direction.value,
+        precision: Number(fields.precision.value),
+        tolerance: Number(fields.tolerance.value)
+      };
+    }
+
+    function validateSettings(settings) {
+      if (!Number.isFinite(settings.anchor) || settings.anchor <= 0) {
+        return "锚点价格必须大于 0。";
+      }
+      if (!Number.isFinite(settings.current) || settings.current <= 0) {
+        return "当前价格必须大于 0。";
+      }
+      if (!Number.isFinite(settings.step) || settings.step <= 0) {
+        return "步长必须大于 0。";
+      }
+      if (!Number.isFinite(settings.tolerance) || settings.tolerance < 0) {
+        return "容差不能小于 0。";
+      }
+      return "";
+    }
+
+    function formatPrice(value, precision) {
+      return Number(value).toLocaleString("zh-CN", {
+        minimumFractionDigits: precision,
+        maximumFractionDigits: precision
+      });
+    }
+
+    function distanceText(level, current, precision) {
+      const diff = level - current;
+      const percent = current === 0 ? 0 : (diff / current) * 100;
+      const sign = diff > 0 ? "+" : "";
+      return `${sign}${formatPrice(diff, precision)} / ${sign}${percent.toFixed(2)}%`;
+    }
+
+    function isNear(value, current, tolerancePercent) {
+      if (tolerancePercent === 0) {
+        return value === current;
+      }
+      return Math.abs(value - current) / current * 100 <= tolerancePercent;
+    }
+
+    function spiralCoordinateMap(size) {
+      const center = Math.floor(size / 2);
+      const total = size * size;
+      const cells = new Map();
+      let row = center;
+      let col = center;
+      let index = 0;
+
+      cells.set(`${row},${col}`, index);
+
+      const directions = [
+        [0, 1],
+        [-1, 0],
+        [0, -1],
+        [1, 0]
+      ];
+      let segmentLength = 1;
+
+      while (index < total - 1) {
+        for (let directionIndex = 0; directionIndex < directions.length; directionIndex += 1) {
+          const [dr, dc] = directions[directionIndex];
+
+          for (let stepIndex = 0; stepIndex < segmentLength; stepIndex += 1) {
+            row += dr;
+            col += dc;
+            index += 1;
+
+            if (row >= 0 && row < size && col >= 0 && col < size) {
+              cells.set(`${row},${col}`, index);
+            }
+
+            if (index >= total - 1) {
+              break;
+            }
+          }
+
+          if (directionIndex % 2 === 1) {
+            segmentLength += 1;
+          }
+
+          if (index >= total - 1) {
+            break;
+          }
+        }
+      }
+
+      return cells;
+    }
+
+    function buildLevelMarks(settings, levels) {
+      const { anchor, step, size } = settings;
+      const total = size * size;
+      const marks = new Map();
+
+      for (const item of levels) {
+        const index = Math.round((item.level - anchor) / step);
+        if (index < 0 || index >= total) {
+          continue;
+        }
+        if (Math.abs(anchor + index * step - item.level) > step / 2) {
+          continue;
+        }
+        if (!marks.has(index)) {
+          marks.set(index, item.direction === "上方阻力" ? "level-up" : "level-down");
+        }
+      }
+
+      return marks;
+    }
+
+    function renderGrid(settings, levels) {
+      const { anchor, current, step, size, precision, tolerance } = settings;
+      const center = Math.floor(size / 2);
+      const cells = spiralCoordinateMap(size);
+      const levelMarks = buildLevelMarks(settings, levels);
+
+      gridEl.innerHTML = "";
+      gridEl.style.gridTemplateColumns = `repeat(${size}, minmax(58px, 1fr))`;
+
+      for (let row = 0; row < size; row += 1) {
+        for (let col = 0; col < size; col += 1) {
+          const index = cells.get(`${row},${col}`);
+          const price = anchor + index * step;
+          const cell = document.createElement("div");
+          const isCenter = row === center && col === center;
+          const isCardinal = row === center || col === center;
+          const isOrdinal = Math.abs(row - center) === Math.abs(col - center);
+          const nearCurrent = isNear(price, current, tolerance);
+          const levelMark = levelMarks.get(index);
+
+          cell.className = "cell";
+          if (isCardinal) cell.classList.add("cardinal");
+          if (isOrdinal) cell.classList.add("ordinal");
+          if (isCenter) cell.classList.add("center");
+          if (levelMark) cell.classList.add(levelMark);
+          if (nearCurrent) cell.classList.add("near-current");
+
+          cell.innerHTML = `
+            <span class="value">${formatPrice(price, precision)}</span>
+            <span class="index">#${index}</span>
+          `;
+
+          gridEl.appendChild(cell);
+        }
+      }
+    }
+
+    function makeLevel(k, level, dirLabel, current, tolerance) {
+      const ring = Math.ceil(k / 8);
+      const angle = (((k - 1) % 8) + 1) * 45;
+      const isCardinal = k % 2 === 0;
+      const isSquaring = k % 8 === 0;
+      return {
+        k,
+        ring,
+        angle,
+        level,
+        direction: dirLabel,
+        type: isCardinal ? "primary" : "secondary",
+        isSquaring,
+        near: isNear(level, current, tolerance)
+      };
+    }
+
+    function calculateLevels(settings) {
+      const { anchor, current, direction, tolerance } = settings;
+      const root = Math.sqrt(anchor);
+      const up = [];
+      const down = [];
+
+      const upTarget = current * (1 + COVER_RATIO);
+      for (let k = 1; ; k += 1) {
+        const factor = k * 0.25;
+        const level = Math.pow(root + factor, 2);
+        up.push(makeLevel(k, level, "上方阻力", current, tolerance));
+        if (k >= MAX_RINGS * 8) break;
+        if (k >= BASE_RINGS * 8 && level >= upTarget) break;
+      }
+
+      const downTarget = current * (1 - COVER_RATIO);
+      for (let k = 1; ; k += 1) {
+        const factor = k * 0.25;
+        if (root - factor <= 0) break;
+        const level = Math.pow(root - factor, 2);
+        down.push(makeLevel(k, level, "下方支撑", current, tolerance));
+        if (k >= MAX_RINGS * 8) break;
+        if (k >= BASE_RINGS * 8 && level <= downTarget) break;
+      }
+
+      let levels = [];
+      if (direction === "both" || direction === "up") {
+        levels = levels.concat(up);
+      }
+      if (direction === "both" || direction === "down") {
+        levels = levels.concat(down);
+      }
+
+      return levels.sort((a, b) => a.level - b.level);
+    }
+
+    function renderSummary(settings, levels) {
+      const { current, precision } = settings;
+      const lower = [...levels].reverse().find((item) => item.level < current);
+      const upper = levels.find((item) => item.level > current);
+
+      summaryEl.innerHTML = `
+        <div class="metric">
+          <strong>${lower ? formatPrice(lower.level, precision) : "无"}</strong>
+          <span>最近下方支撑</span>
+        </div>
+        <div class="metric">
+          <strong>${upper ? formatPrice(upper.level, precision) : "无"}</strong>
+          <span>最近上方阻力</span>
+        </div>
+      `;
+    }
+
+    function renderLevels(settings, levels) {
+      const { current, precision } = settings;
+      levelsBody.innerHTML = "";
+
+      for (const item of levels) {
+        const row = document.createElement("tr");
+        if (item.near) {
+          row.classList.add("near-row");
+        }
+
+        row.innerHTML = `
+          <td>
+            <span class="tag ${item.type}">第${item.ring}圈·${item.angle}°</span>
+            ${item.isSquaring ? '<span class="tag squaring">整圈</span>' : ""}
+            ${item.near ? '<span class="tag near">接近</span>' : ""}
+          </td>
+          <td>${item.direction}</td>
+          <td>${formatPrice(item.level, precision)}</td>
+          <td>${distanceText(item.level, current, precision)}</td>
+        `;
+
+        levelsBody.appendChild(row);
+      }
+    }
+
+    function render() {
+      const settings = readSettings();
+      const error = validateSettings(settings);
+
+      if (error) {
+        statusEl.textContent = error;
+        statusEl.classList.add("error");
+        return;
+      }
+
+      statusEl.classList.remove("error");
+      const levels = calculateLevels(settings);
+      renderGrid(settings, levels);
+      renderSummary(settings, levels);
+      renderLevels(settings, levels);
+      statusEl.textContent = `已更新：锚点 ${formatPrice(settings.anchor, settings.precision)}，当前价 ${formatPrice(settings.current, settings.precision)}`;
+    }
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      render();
+    });
+
+    render();
+  </script>
+</body>
+</html>
