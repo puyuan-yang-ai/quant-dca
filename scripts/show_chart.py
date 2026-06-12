@@ -14,7 +14,7 @@ from src.backtest_engine import BacktestEngine
 from src.strategies.composable import ComposableStrategy
 from src.interactive_chart import show_interactive_chart
 from src.breadth_divergence import detect_breadth_divergence
-from src.indicators import detect_swing_lows, detect_swing_highs, filter_swing_lows_by_drop
+from src.indicators import detect_swing_lows
 import csv
 
 from experiments.configs import (
@@ -106,6 +106,133 @@ def load_vix(filepath, start_date, end_date):
     return vix_data if vix_data else None
 
 
+def generate_ml_markers(start_date, end_date):
+    """运行 ML pipeline + 推理模式，覆盖到最新 NDay5 信号日。
+
+    流程：
+      1. 对有标签的信号做 80/20 切分 → 训练模型 → 预测测试集 (WIN/LOSS)
+      2. 对最近无标签的 NDay5 信号也构造特征 → 模型推理 (PRED)
+    """
+    import importlib
+    import pandas as pd
+    from ml.labeling import load_spy, generate_nday_signals, create_labels_sl_proximity, create_labels_sl_multi
+    from ml.versions import get_active_config
+    from xgboost import XGBClassifier
+
+    config = get_active_config()
+    feat_mod = importlib.import_module(config["features_module"])
+    lab_cfg = config["labeling"]
+
+    spy_df = load_spy()
+    signal = generate_nday_signals(spy_df, n=5)
+
+    # --- 有标签的信号（用于训练和回测评估）---
+    lab_method = lab_cfg.get("method", "sl_proximity")
+    if lab_method == "sl_multi":
+        labeled = create_labels_sl_multi(
+            spy_df, signal,
+            sl_ns=lab_cfg.get("sl_ns", [5, 7]),
+            k=lab_cfg.get("k", 3),
+        )
+    else:
+        labeled = create_labels_sl_proximity(
+            spy_df, signal,
+            sl_n=lab_cfg.get("sl_n", 7),
+            k=lab_cfg.get("k", 3),
+        )
+    data, feature_cols = feat_mod.build_features(labeled, spy_df)
+    data = data.dropna(subset=feature_cols)
+
+    split_idx = int(len(data) * 0.8)
+    train = data.iloc[:split_idx]
+    test = data.iloc[split_idx:]
+
+    model_cfg = config.get("model", {})
+    model = XGBClassifier(
+        n_estimators=model_cfg.get("n_estimators", 100),
+        max_depth=model_cfg.get("max_depth", 4),
+        learning_rate=model_cfg.get("learning_rate", 0.1),
+        eval_metric="logloss", random_state=42, verbosity=0,
+    )
+    model.fit(train[feature_cols].values, train["label"].values)
+
+    # --- 推理：找出有标签之外的 NDay5 信号日 ---
+    labeled_dates = set(data["date"].values)
+    signal_dates = spy_df[signal]["date"].values
+    unlabeled_dates = [d for d in signal_dates if d not in labeled_dates]
+
+    unlabeled_signals = []
+    if unlabeled_dates:
+        unlabeled_df = spy_df[signal & ~spy_df["date"].isin(labeled_dates)].copy()
+        dummy_labeled = pd.DataFrame({
+            "date": unlabeled_df["date"].values,
+            "label": 0,
+            "forward_return": float("nan"),
+        })
+        infer_data, _ = feat_mod.build_features(dummy_labeled, spy_df)
+        infer_data = infer_data.dropna(subset=feature_cols)
+        if len(infer_data) > 0:
+            infer_proba = model.predict_proba(infer_data[feature_cols].values)[:, 1]
+            infer_data = infer_data.copy()
+            infer_data["proba"] = infer_proba
+            unlabeled_signals = infer_data
+
+    # --- 组装 ML 信号列表 ---
+    ml_signals = []
+
+    # 测试集（有标签 → WIN/LOSS）
+    test = test.copy()
+    test["proba"] = model.predict_proba(test[feature_cols].values)[:, 1]
+    for _, row in test.iterrows():
+        date_str = row["date"].strftime("%Y-%m-%d")
+        if date_str < start_date or date_str > end_date:
+            continue
+        if row["proba"] >= 0.5:
+            ml_signals.append({
+                "date": date_str,
+                "action": "buy",
+                "win": row["forward_return"] > 0,
+                "ret": row["forward_return"],
+                "proba": row["proba"],
+            })
+        else:
+            ml_signals.append({
+                "date": date_str,
+                "action": "skip",
+                "proba": row["proba"],
+            })
+
+    # 推理信号（无标签 → PRED）
+    pred_buy = pred_skip = 0
+    if isinstance(unlabeled_signals, pd.DataFrame) and len(unlabeled_signals) > 0:
+        for _, row in unlabeled_signals.iterrows():
+            date_str = row["date"].strftime("%Y-%m-%d")
+            if date_str < start_date or date_str > end_date:
+                continue
+            if row["proba"] >= 0.5:
+                ml_signals.append({
+                    "date": date_str,
+                    "action": "buy",
+                    "pred": True,
+                    "proba": row["proba"],
+                })
+                pred_buy += 1
+            else:
+                ml_signals.append({
+                    "date": date_str,
+                    "action": "skip",
+                    "pred": True,
+                    "proba": row["proba"],
+                })
+                pred_skip += 1
+
+    backtest_buy = sum(1 for s in ml_signals if s['action'] == 'buy' and not s.get('pred'))
+    backtest_skip = sum(1 for s in ml_signals if s['action'] == 'skip' and not s.get('pred'))
+    print(f"ML 信号 — 回测: {backtest_buy} 买入 + {backtest_skip} 跳过 | "
+          f"推理: {pred_buy} 买入 + {pred_skip} 跳过")
+    return ml_signals
+
+
 def main():
     parser = argparse.ArgumentParser(description='交互式策略图表查看')
     parser.add_argument('--env', type=str, default='bear-bull',
@@ -116,6 +243,8 @@ def main():
                         help='策略选择（默认 best 最优策略）')
     parser.add_argument('--port', type=int, default=9870,
                         help='HTTP 服务端口（默认 9870）')
+    parser.add_argument('--ml', action='store_true',
+                        help='叠加 ML meta-labeling 信号标注')
     args = parser.parse_args()
 
     env = MARKET_ENVS[args.env]
@@ -131,15 +260,12 @@ def main():
     # 加载 Breadth 数据（含连续弱势曲线）
     breadth_data, breadth_consec = load_breadth(os.path.join(root, BREADTH_FILE), env['start'], env['end'])
 
-    # 检测 Swing Low（N=10）+ 最小跌幅过滤
+    # 检测 Swing Low — 使用 GT 标注的尺度 (SL7 only)
     close_prices = [d['close'] for d in data]
     dates = [d['date'] for d in data]
-    sl10_all = detect_swing_lows(close_prices, dates, 10)
-    sh10 = detect_swing_highs(close_prices, dates, 10)
-    sl10_kept, sl10_filtered = filter_swing_lows_by_drop(sl10_all, sh10, min_drop=0.03)
-    print(f"Swing Low (N=10)：{len(sl10_all)} 个 → 过滤后 {len(sl10_kept)} 个保留，{len(sl10_filtered)} 个被过滤")
-    # swing_lows 格式：{10: kept, 'filtered': filtered_out}
-    swing_lows = {10: sl10_kept, 'filtered': sl10_filtered}
+    sl7_all = detect_swing_lows(close_prices, dates, 7)
+    print(f"GT Swing Low (SL7)：{len(sl7_all)} 个")
+    swing_lows = {'gt7': sl7_all}
 
     # 计算 Breadth 背离
     breadth_divergences = None
@@ -170,13 +296,20 @@ def main():
           f"最大回撤：{metrics['max_drawdown']*100:.1f}%")
     print(f"交易记录：{len(metrics.get('trade_log', []))} 笔")
 
+    # ML 信号
+    ml_signals = None
+    if args.ml:
+        print("加载 ML meta-labeling 信号...")
+        ml_signals = generate_ml_markers(env['start'], env['end'])
+
     title = f"SPY DCA [{strat_config['label']}] — {env['label']}（{env['start']} ~ {env['end']}）"
     show_interactive_chart(data, metrics, title=title, port=args.port,
                            breadth_data=breadth_data,
                            breadth_divergences=breadth_divergences,
                            breadth_consec=breadth_consec,
                            swing_lows=swing_lows,
-                           show_trades=False)
+                           show_trades=False,
+                           ml_signals=ml_signals)
 
 
 if __name__ == '__main__':

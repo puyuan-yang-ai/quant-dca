@@ -18,7 +18,7 @@ def show_interactive_chart(data, metrics, title='SOXL DCA 回测',
                            output_dir='output', port=9870, breadth_data=None,
                            vix_data=None, breadth_divergences=None,
                            breadth_consec=None, swing_lows=None,
-                           show_trades=True):
+                           show_trades=True, ml_signals=None):
     """
     生成交互式 K 线图并启动 HTTP 服务
 
@@ -73,6 +73,37 @@ def show_interactive_chart(data, metrics, title='SOXL DCA 回测',
                     'shape': 'arrowDown',
                     'color': '#F44336',
                     'text': f"止盈 ${trade['profit']:.0f}",
+                })
+
+    # ML 信号标记
+    if ml_signals:
+        for sig in ml_signals:
+            is_pred = sig.get('pred', False)
+            if sig['action'] == 'buy':
+                if is_pred:
+                    color = '#2196F3'
+                    label = 'PRED BUY'
+                    text = f"ML {label} (p={sig.get('proba', 0):.2f})"
+                else:
+                    color = '#4CAF50' if sig.get('win') else '#F44336'
+                    label = 'WIN' if sig.get('win') else 'LOSS'
+                    text = f"ML {label} {sig.get('ret', 0)*100:+.1f}%"
+                markers.append({
+                    'time': sig['date'],
+                    'position': 'belowBar',
+                    'shape': 'arrowUp',
+                    'color': color,
+                    'text': text,
+                })
+            elif sig['action'] == 'skip':
+                color = '#90CAF9' if is_pred else '#9E9E9E'
+                label = 'PRED SKIP' if is_pred else 'SKIP'
+                markers.append({
+                    'time': sig['date'],
+                    'position': 'aboveBar',
+                    'shape': 'circle',
+                    'color': color,
+                    'text': f"ML {label} (p={sig.get('proba', 0):.2f})",
                 })
 
     # 按时间排序（Lightweight Charts 要求）
@@ -689,8 +720,10 @@ if (emaData.length > 0) {{
 // 交易标记 + Swing Low 标记（合并到同一个 markers 数组）
 const markers = {json.dumps(markers, ensure_ascii=False)};
 const swingLows = {json.dumps(swing_lows if swing_lows else {{}})};
-// Swing Low 标记：保留=橙色，被过滤=灰色
+// Swing Low 标记：GT SL7=橙色，GT SL5-only=浅蓝
 const swingConfig = {{
+  'gt7': {{ color: '#FF6D00', text: 'GT:SL7' }},
+  'gt5': {{ color: '#42A5F5', text: 'GT:SL5' }},
   '10': {{ color: '#FF6D00', text: 'SL10' }},
   'filtered': {{ color: '#888888', text: 'x' }},
 }};
