@@ -123,12 +123,22 @@ def fetch_safe_haven():
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="情绪指标数据获取")
+    parser.add_argument("--vix-only", action="store_true",
+                        help="只拉取 VIX，跳过 Safe Haven")
+    args = parser.parse_args()
+
     print("=" * 60)
     print("  情绪指标数据获取")
     print("=" * 60)
 
     fetch_vix()
-    fetch_safe_haven()
+
+    if not args.vix_only:
+        fetch_safe_haven()
+    else:
+        print("\n  --vix-only: 跳过 Safe Haven")
 
     print("\n" + "=" * 60)
     print("  全部完成！")

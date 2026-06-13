@@ -53,18 +53,33 @@ SMA_WINDOW = 20
 
 
 def get_sp500_tickers():
-    """从 Wikipedia 获取当前 S&P 500 成分股列表"""
+    """获取当前 S&P 500 成分股列表（Wikipedia 优先，GitHub 备用）"""
     from io import StringIO
-    url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
-    print(f"正在从 Wikipedia 获取 S&P 500 成分股列表...")
-    # Wikipedia 封禁了代理数据中心 IP，直连即可（Wikipedia 在国内可正常访问）
-    resp = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=30)
+
+    # 数据源 1: Wikipedia
+    wiki_url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
+    print("正在获取 S&P 500 成分股列表...")
+    try:
+        resp = requests.get(wiki_url, headers={
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+        }, timeout=30)
+        resp.raise_for_status()
+        tables = pd.read_html(StringIO(resp.text))
+        tickers = tables[0]['Symbol'].tolist()
+        tickers = [t.replace('.', '-') for t in tickers]
+        print(f"  (Wikipedia) 获取到 {len(tickers)} 只成分股")
+        return tickers
+    except Exception as e:
+        print(f"  Wikipedia 不可用 ({e})，切换到 GitHub 备用源...")
+
+    # 数据源 2: GitHub datasets/s-and-p-500-companies
+    gh_url = 'https://raw.githubusercontent.com/datasets/s-and-p-500-companies/main/data/constituents.csv'
+    resp = requests.get(gh_url, timeout=15)
     resp.raise_for_status()
-    tables = pd.read_html(StringIO(resp.text))
-    tickers = tables[0]['Symbol'].tolist()
-    # 修正 Wikipedia 中的特殊字符（如 BRK.B → BRK-B）
+    df = pd.read_csv(StringIO(resp.text))
+    tickers = df['Symbol'].tolist()
     tickers = [t.replace('.', '-') for t in tickers]
-    print(f"获取到 {len(tickers)} 只成分股")
+    print(f"  (GitHub) 获取到 {len(tickers)} 只成分股")
     return tickers
 
 
