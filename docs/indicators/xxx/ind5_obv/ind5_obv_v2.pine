@@ -1,0 +1,75 @@
+// =============================================================================
+// 指标⑤ OBV量能潮 — 精简版 v2（TradingView 验证版）
+// 在 ind5_obv.pine 基础上重构，目标：高信噪比、可读性强。
+//
+// 【相比 v1 的改动】
+//   1. 量能潮归一化到 0-100（v1 是上亿量纲、肉眼无法判断高低）。
+//   2. 删除满屏“量价同步 QS”粉色背景（条件太宽、信号太密 = 等于没信号）。
+//   3. 只保留两类真正有价值的信号：
+//        - 量价背离（价格新高/新低，但量能不配合）→ 转折预警
+//        - 天量 ③④（近 120/250 日最大量）→ 常对应恐慌底 / 出货顶
+//   4. 删除 ①②（30/60 日量峰），它们太频繁、属噪声。
+//
+// 【用途】TradingView 肉眼验证；通过后用 ind5_obv_v2.py 接入量化系统。
+// =============================================================================
+//@version=5
+indicator("指标⑤ OBV量能潮 精简版v2", overlay=false)
+
+// ---------- 参数 ----------
+normLen = input.int(100, "归一化窗口(根)")
+pivLen  = input.int(5,   "背离枢轴长度(左右各N根)")
+showHV  = input.bool(true, "显示天量 ③④")
+
+// ---------- OBV 量能潮振荡器 ----------
+// VA = 收涨记 +VOL / 收跌记 -VOL；累加得 OBV；再取短长均线之差得振荡器（围绕 0）
+va     = close > close[1] ? volume : (close < close[1] ? -volume : 0.0)
+obv    = ta.cum(va)
+obvOsc = ta.ema(obv, 3) - ta.sma(obv, 9)
+
+// ---------- 归一化到 0-100 ----------
+// 用最近 normLen 根的 min/max 把振荡器拉伸到 0-100，方便读“强/中/弱”
+ll = ta.lowest(obvOsc, normLen)
+hh = ta.highest(obvOsc, normLen)
+obvNorm = (hh - ll) == 0 ? 50.0 : (obvOsc - ll) / (hh - ll) * 100.0
+
+// ---------- 量价背离（枢轴比较）----------
+// 枢轴：左右各 pivLen 根的局部高/低点。注意：枢轴需要右侧 pivLen 根才能确认，
+// 所以信号在"枢轴 + pivLen"那根（即 plFound/phFound 为真的当根）才真正可知。
+// 【不要】用 offset=-pivLen 把标签画回高/低点当天——那会造成"价格已跌几天才标顶背"
+// 的事后诸葛亮假象（repaint/前视偏差）。本版标签就画在确认当根，诚实但滞后 pivLen 根。
+plFound = not na(ta.pivotlow(low,  pivLen, pivLen))
+phFound = not na(ta.pivothigh(high, pivLen, pivLen))
+
+// 底背离：本次价格低点 < 上次低点（价格新低），但量能低点 > 上次（量能未新低）→ 看涨
+priceLow     = ta.valuewhen(plFound, low[pivLen], 0)
+prevPriceLow = ta.valuewhen(plFound, low[pivLen], 1)
+obvAtLow     = ta.valuewhen(plFound, obvNorm[pivLen], 0)
+prevObvAtLow = ta.valuewhen(plFound, obvNorm[pivLen], 1)
+bullDiv = plFound and (priceLow < prevPriceLow) and (obvAtLow > prevObvAtLow)
+
+// 顶背离：本次价格高点 > 上次高点（价格新高），但量能高点 < 上次（量能未新高）→ 看跌
+priceHigh     = ta.valuewhen(phFound, high[pivLen], 0)
+prevPriceHigh = ta.valuewhen(phFound, high[pivLen], 1)
+obvAtHigh     = ta.valuewhen(phFound, obvNorm[pivLen], 0)
+prevObvAtHigh = ta.valuewhen(phFound, obvNorm[pivLen], 1)
+bearDiv = phFound and (priceHigh > prevPriceHigh) and (obvAtHigh < prevObvAtHigh)
+
+// ---------- 天量（只保留 120/250 日量峰）----------
+hv4 = volume == ta.highest(volume, 250)
+hv3 = volume == ta.highest(volume, 120) and not hv4
+
+// =============================================================================
+// 绘制
+// =============================================================================
+plot(obvNorm, "量能潮(归一化)", color=color.new(color.aqua, 0), linewidth=2)
+hline(80, "强", color=color.new(color.red,   60), linestyle=hline.style_dotted)
+hline(50, "中", color=color.new(color.gray,  60), linestyle=hline.style_dotted)
+hline(20, "弱", color=color.new(color.green, 60), linestyle=hline.style_dotted)
+
+// 背离标记（画在确认当根，无 offset；故比高/低点滞后 pivLen 根，但不重绘、不前视）
+plotshape(bullDiv, "底背离", shape.labelup,   location.bottom, color.new(color.red, 0),   text="底背", textcolor=color.white, size=size.small)
+plotshape(bearDiv, "顶背离", shape.labeldown, location.top,    color.new(color.green, 0), text="顶背", textcolor=color.white, size=size.small)
+
+// 天量标记
+plotchar(showHV and hv4, "④250日天量", "④", location.top, color.new(color.orange, 0), size=size.tiny)
+plotchar(showHV and hv3, "③120日大量", "③", location.top, color.new(color.yellow, 0), size=size.tiny)

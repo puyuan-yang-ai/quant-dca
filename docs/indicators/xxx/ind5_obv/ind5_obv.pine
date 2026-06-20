@@ -1,0 +1,56 @@
+// =============================================================================
+// 指标⑤ 成交量能 - OBV量能潮 + 量价确认 + 放量分级（TradingView 验证版）
+// 译自通达信原始公式（docs/indicators/xxx/指标.txt 第 246-316 行）的可移植部分
+//
+// 【用途】TradingView 图表肉眼验证；通过后再用 Python 版接入量化系统。
+//
+// 【翻译范围】只翻译纯 OHLCV 可算部分：
+//   - OBV 量能潮（OBV3）
+//   - 量价同步确认（QS：量能与 3 日均价同时向上）
+//   - 量均线 5/35/135
+//   - 放量分级 FL1~FL4（突破 30/60/120/250 日量峰）
+// 【已丢弃】原文“吸拉派落”依赖外部指标 XLPL.吸/拉/派/落，无法移植，已删除；
+//          所有 STICKLINE 分色柱仅为可视化，简化为标记。
+//
+// 【对齐点】OBV 累加、EMA、MA(=SMA) 两版一致；HHV 用 ta.highest。
+// =============================================================================
+//@version=5
+indicator("指标⑤ OBV量能潮+量价确认", overlay=false)
+
+// ---------- OBV 量能潮 ----------
+// VA := IF(C>REF(C,1), VOL, -VOL)；C=REF(C,1) 时计 0
+va  = close > close[1] ? volume : (close < close[1] ? -volume : 0.0)
+obv1 = ta.cum(va)                       // SUM(...,0) 全程累加 = 累计 OBV
+obv2 = ta.ema(obv1, 3) - ta.sma(obv1, 9)
+obv3 = ta.ema(math.max(obv2, 0), 3)     // 量能潮：只取正的 OBV2 再平滑
+
+// ---------- 量价同步确认 QS ----------
+mac3 = ta.sma(close, 3)
+qs = obv3 > obv3[1] and mac3 > mac3[1]   // 量能上升 且 3日均价上升
+
+// ---------- 量均线 ----------
+v5   = ta.sma(volume, 5)
+v35  = ta.sma(volume, 35)
+v135 = ta.sma(volume, 135)
+
+// ---------- 放量分级（突破 N 日量峰）----------
+fl4 = volume == ta.highest(volume, 250)
+fl3 = volume == ta.highest(volume, 120) and not fl4
+fl2 = volume == ta.highest(volume, 60)  and not (volume == ta.highest(volume, 120)) and not fl4
+fl1 = volume == ta.highest(volume, 30)  and not (volume == ta.highest(volume, 60))  and not (volume == ta.highest(volume, 120)) and not fl4
+
+// =============================================================================
+// 绘制
+// =============================================================================
+plot(obv3, "量能潮 OBV3", color=color.new(color.white, 0), linewidth=2)
+plot(0, "零轴", color=color.gray)
+
+// 量价同步：在零轴附近用绿色背景标注
+bgcolor(qs ? color.new(color.purple, 80) : na, title="量价同步QS")
+plotshape(qs and not qs[1], "QS启动", shape.triangleup, location.bottom, color.new(color.fuchsia, 0), size=size.tiny)
+
+// 放量分级标记（数字 1/2/3/4 表示放量级别，4 最强）
+plotchar(fl4, "④250日量峰", "④", location.top, color.white, size=size.tiny)
+plotchar(fl3, "③120日量峰", "③", location.top, color.aqua,  size=size.tiny)
+plotchar(fl2, "②60日量峰",  "②", location.top, color.yellow,size=size.tiny)
+plotchar(fl1, "①30日量峰",  "①", location.top, color.gray,  size=size.tiny)

@@ -1,0 +1,114 @@
+// =============================================================================
+// 指标④ 超买超卖 - 三重背离 + RSI 超卖买点（TradingView 验证版）
+// 译自通达信原始公式（docs/indicators/xxx/指标.txt 第 191-244 行）
+//
+// 【用途】此 Pine 版仅用于在 TradingView 图表上肉眼验证信号点位是否有效；
+//        验证通过后，再以同逻辑的 Python 版（ind4_divergence.py）接入量化系统。
+//
+// 【与原公式的对齐点】
+//   - 原公式用通达信内置 MACD.DIF/DEA、KDJ.K/D、RSI.RSI1/RSI2，参数取通达信默认：
+//       MACD(12,26,9)、KDJ(9,3,3)、RSI 双线(6,12)
+//   - 通达信 SMA(X,N,M) = (M*X + (N-M)*prev)/N，是 RMA 的一般形式；
+//     KDJ 的 SMA(RSV,3,1) 等价于 RMA(RSV,3)；本文用 ta.rma 精确复现。
+//   - 背离判断完全照搬原公式：在“相邻两次金叉/死叉”之间比较价格与指标高低。
+//
+// 【已知差异点 / 验证时注意】
+//   1. TradingView 内置 MACD/KDJ/RSI 与通达信默认算法一致（都用 RMA/EMA），数值应吻合。
+//   2. 原公式 RSI 双线周期推断为 6/12（A02 用 7，VAR03 用 7）；下方“超卖买点”严格按原文用 7。
+//   3. 阈值（背离触发、超卖 12/超买 79）沿用原指标，针对个股调过，
+//      用在 SPY/SMH 上可能需要按品种重调，验证时重点观察。
+// =============================================================================
+//@version=5
+indicator("指标④ 三重背离+超卖买点", overlay=false)
+
+// ---------- 参数 ----------
+showMACDdiv = input.bool(true,  "MACD 背离")
+showKDJdiv  = input.bool(true,  "KDJ 背离")
+showRSIdiv  = input.bool(true,  "RSI 背离")
+
+// ---------- MACD(12,26,9) ----------
+dif  = ta.ema(close, 12) - ta.ema(close, 26)
+dea  = ta.ema(dif, 9)
+
+// ---------- KDJ(9,3,3) ：用 RMA 复现通达信 SMA(x,3,1) ----------
+rsv  = ta.stoch(close, high, low, 9)
+kdj_k = ta.rma(rsv, 3)
+kdj_d = ta.rma(kdj_k, 3)
+
+// ---------- RSI 双线(6,12)：通达信 RSI = SMA(MAX(C-LC,0),N,1)/SMA(ABS(C-LC),N,1)*100 ----------
+lc   = close[1]
+up   = math.max(close - lc, 0)
+absc = math.abs(close - lc)
+rsi1 = ta.rma(up, 6) / ta.rma(absc, 6) * 100   // 快 RSI
+rsi2 = ta.rma(up, 12) / ta.rma(absc, 12) * 100 // 慢 RSI
+
+// =============================================================================
+// 通用背离检测函数
+// 原公式范式（以底背离为例）：
+//   A := BARSLAST(REF(CROSS(fast,slow),1))           上一次金叉距今天数
+//   B := REF(C, A+1) > C                              上次金叉前一天收盘 > 今天收盘（价创新低）
+//        AND REF(fast, A+1) < fast                    上次金叉前一天指标 < 今天指标（指标未新低）
+//        AND CROSS(fast, slow)                        且今天又发生金叉
+//
+// barsSince(cond[1]) 即 BARSLAST(REF(cond,1))：上一次（不含今天）cond 成立距今天数。
+// =============================================================================
+
+// 底背离：fast 上穿 slow（金叉）时，价格创新低但指标未创新低
+// 注意：写成单行函数（避免在 TradingView 编辑器逐字符输入时缩进雪崩，见 README 警告）
+// idx = BARSLAST(REF(cross,1)) + 1，即“上一次金叉前一天”相对今天的偏移
+f_bottomDiv(fast, slow) => ta.crossover(fast, slow) and (close[ta.barssince(ta.crossover(fast, slow)[1]) + 1] > close) and (fast[ta.barssince(ta.crossover(fast, slow)[1]) + 1] < fast)
+
+// 顶背离：fast 下穿 slow（死叉）时，价格创新高但指标未创新高
+f_topDiv(fast, slow) => ta.crossunder(fast, slow) and (close[ta.barssince(ta.crossunder(fast, slow)[1]) + 1] < close) and (fast[ta.barssince(ta.crossunder(fast, slow)[1]) + 1] > fast)
+
+macdBottom = f_bottomDiv(dif, dea)
+macdTop    = f_topDiv(dif, dea)
+kdjBottom  = f_bottomDiv(kdj_k, kdj_d)
+kdjTop     = f_topDiv(kdj_k, kdj_d)
+rsiBottom  = f_bottomDiv(rsi1, rsi2)
+rsiTop     = f_topDiv(rsi1, rsi2)
+
+// =============================================================================
+// 超卖买点 / 超买卖点（原文 218-242 行）
+//   A02 := SMA(MAX(C-REF(C,2),0),7,1)/SMA(ABS(C-REF(C,2)),7,1)*100   （隔日 RSI，周期7）
+//   VAR03 := 同上但用 REF(C,1)（当日 RSI，周期7）
+//   买 := A02<12 OR VAR03<12 ；卖 := A02>79
+// =============================================================================
+lc2   = close[2]
+up2   = math.max(close - lc2, 0)
+abs2  = math.abs(close - lc2)
+a02   = ta.rma(up2, 7) / ta.rma(abs2, 7) * 100
+
+up1   = math.max(close - close[1], 0)
+abs1  = math.abs(close - close[1])
+var03 = ta.rma(up1, 7) / ta.rma(abs1, 7) * 100
+
+buySig  = a02 < 12 or var03 < 12
+sellSig = a02 > 79
+
+// =============================================================================
+// 绘制
+// =============================================================================
+hline(0, "零轴", color=color.gray)
+plot(a02,   "A02隔日RSI(7)", color=color.new(color.yellow, 0))
+plot(var03, "VAR03当日RSI(7)", color=color.new(color.aqua, 50))
+hline(79, "超买79", color=color.red,   linestyle=hline.style_dashed)
+hline(12, "超卖12", color=color.green, linestyle=hline.style_dashed)
+
+// 三重底背离（图下方标注）
+plotshape(showMACDdiv and macdBottom, "MACD底背", shape.labelup,  location.bottom, color.red,     text="M底", textcolor=color.white, size=size.tiny)
+plotshape(showKDJdiv  and kdjBottom,  "KDJ底背",  shape.labelup,  location.bottom, color.fuchsia, text="K底", textcolor=color.white, size=size.tiny)
+plotshape(showRSIdiv  and rsiBottom,  "RSI底背",  shape.labelup,  location.bottom, color.white,   text="R底", textcolor=color.black, size=size.tiny)
+
+// 三重顶背离（图上方标注）
+plotshape(showMACDdiv and macdTop, "MACD顶背", shape.labeldown, location.top, color.yellow,  text="M顶", textcolor=color.black, size=size.tiny)
+plotshape(showKDJdiv  and kdjTop,  "KDJ顶背",  shape.labeldown, location.top, color.fuchsia, text="K顶", textcolor=color.white, size=size.tiny)
+plotshape(showRSIdiv  and rsiTop,  "RSI顶背",  shape.labeldown, location.top, color.aqua,    text="R顶", textcolor=color.black, size=size.tiny)
+
+// 超卖买点 / 超买卖点
+plotshape(buySig,  "买点",  shape.triangleup,   location.bottom, color.new(color.red, 0),   size=size.small)
+plotshape(sellSig, "卖点",  shape.triangledown, location.top,    color.new(color.green, 0), size=size.small)
+
+// 三重底背离共振（三个同时出现，最强信号）
+tripleBottom = macdBottom and kdjBottom and rsiBottom
+bgcolor(tripleBottom ? color.new(color.red, 80) : na, title="三重底背离共振")

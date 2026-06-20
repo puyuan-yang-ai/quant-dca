@@ -1,0 +1,46 @@
+// =============================================================================
+// 指标① 主力指标 - 买点雷达 + 卖点雷达（TradingView 验证版）
+// 译自通达信原始公式（docs/indicators/xxx/指标.txt 第 24-36 行）
+//
+// 【用途】TradingView 图表肉眼验证；通过后再用 Python 版接入量化系统。
+//
+// 【翻译范围】只翻译信号价值高的“买/卖点雷达”：
+//   - 卖点雷达：6日RSI 从超买区下穿 85（CROSS(85,RSI1)）→ 顶部预警
+//   - 买点雷达：多周期RSI 同时超卖 + AR人气低 + 上市足够久
+// 【已丢弃】原文“主力吸货 VAR7”那段为可视化分色柱、逻辑晦涩、信号价值低，已删除。
+//
+// 【对齐点】通达信 RSI = RMA(MAX(C-LC,0),N)/RMA(ABS(C-LC),N)*100，用 ta.rma 复现。
+// 【已知差异点】
+//   - 原文 VARD=BARSCOUNT(C)（该股上市以来 K 线数），用于过滤次新股；
+//     SPY/SMH 数据足够长，此条件恒为真，验证时可忽略或视作 bar_index>50。
+//   - 阈值（85/20/25/70）针对 A 股个股调过，用于 ETF 可能需重调。
+// =============================================================================
+//@version=5
+indicator("指标① 买卖雷达", overlay=false)
+
+// ---------- 通达信 RSI 通用函数 ----------
+// 写成单行函数（避免 TradingView 编辑器逐字符输入时缩进雪崩，见 README 警告）
+f_tdxRSI(src, len) => ta.rma(math.max(src - src[1], 0), len) / ta.rma(math.abs(src - src[1]), len) * 100
+
+// ---------- 卖点雷达 ----------
+rsi1 = f_tdxRSI(close, 6)
+sellRadar = ta.crossunder(rsi1, 85)   // CROSS(85, RSI1) = RSI1 下穿 85
+
+// ---------- 买点雷达 ----------
+// AR 人气指标：SUM(H-O,26)/SUM(O-L,26)*100
+ar = math.sum(high - open, 26) / math.sum(open - low, 26) * 100
+varb = f_tdxRSI(close, 7)
+varc = f_tdxRSI(close, 13)
+vard = bar_index                       // 近似 BARSCOUNT(C)：上市以来 bar 数
+buyRadar = varb < 20 and varc < 25 and vard > 50 and ar < 70
+
+// =============================================================================
+// 绘制
+// =============================================================================
+plot(rsi1, "6日RSI", color=color.new(color.aqua, 0))
+plot(varc, "13日RSI", color=color.new(color.orange, 50))
+hline(85, "超买85", color=color.red,   linestyle=hline.style_dashed)
+hline(20, "超卖20", color=color.green, linestyle=hline.style_dashed)
+
+plotshape(buyRadar,  "买点雷达", shape.triangleup,   location.bottom, color.new(color.blue, 0),  text="买", textcolor=color.white, size=size.small)
+plotshape(sellRadar, "卖点雷达", shape.triangledown, location.top,    color.new(color.green, 0), text="顶", textcolor=color.white, size=size.small)
