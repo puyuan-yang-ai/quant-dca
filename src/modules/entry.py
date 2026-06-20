@@ -354,6 +354,28 @@ class BreadthDivergenceEntry:
                 f"window={self.window}, signals={len(self._buy_dates)})")
 
 
+class OOSProbaEntry:
+    """
+    模型样本外概率过滤入场
+
+    传入"模型放行的信号日日期集合"(已是 NDay5 信号 ∩ 概率>阈值 的子集),
+    当天日期命中即市价买入。用于经济回测中的 B 组(NDay5 + 模型过滤)。
+    日期字符串格式必须与引擎 day['date'] 一致(见调用方做对齐转换)。
+    """
+
+    def __init__(self, pass_dates):
+        self._buy_dates = set(pass_dates)
+
+    def should_market_buy(self, context):
+        return context.day['date'] in self._buy_dates
+
+    def should_place_limits(self, context):
+        return False
+
+    def __repr__(self):
+        return f"OOSProbaEntry(signals={len(self._buy_dates)})"
+
+
 class AndEntry:
     """
     通用 AND 组合器
