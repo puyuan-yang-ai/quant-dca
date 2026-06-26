@@ -6,12 +6,20 @@
 
 | 脚本 | 作用 | 运行 |
 |------|------|------|
-| ⭐ `eval_by_label.py` | **【权威】**用 label 列（训练口径=评估口径）评估抓底 P/R。**门槛决策以此为准** | `python -m ml.research.eval_by_label` |
-| `diag_threshold_quality.py` | 秒级静态诊断：各 NDay 门槛的信号数、信号质量、池内可分性 | `python -m ml.research.diag_threshold_quality` |
-| `plot_threshold_event.py` | 画 阈值 vs 信号簇 曲线（连续加仓洞察，口径无关部分有效） | `python -m ml.research.plot_threshold_event --n 2` |
+**全部脚本均已统一为 label 列口径（训练口径=评估口径），结论一致指向 N=2 @0.35。**
 
-**⚠️ 以下脚本用了"几何比对"口径（与训练 label 不一致），仅作弯路记录，不可作门槛决策依据**（详见 `docs/tasks/260626-ml-bottom-catch-diagnosis/diagnosis.md` §11）：
-`sweep_ndays_precision_recall.py`、`plot_precision_recall.py`、`sweep_threshold_event.py`、`grid_search_n_threshold.py`、`plot_n1_vs_n2.py`
+| 脚本 | 作用 | 运行 |
+|------|------|------|
+| ⭐ `eval_by_label.py` | **【权威】**用 label 列评估各 N 抓底 P/R，门槛决策主依据 | `python -m ml.research.eval_by_label` |
+| `diag_threshold_quality.py` | 秒级静态诊断：各 NDay 门槛信号数/质量/池内可分性 | `python -m ml.research.diag_threshold_quality` |
+| `sweep_ndays_precision_recall.py` | NDay 门槛遍历 P/R（label 口径） | `python -m ml.research.sweep_ndays_precision_recall` |
+| `plot_precision_recall.py` | 各 N 的 P-R 权衡曲线 + F1/F2（label 口径） | `python -m ml.research.plot_precision_recall` |
+| `sweep_threshold_event.py` | 阈值扫描 P/R（label 口径）+ 信号簇（连续加仓洞察） | `python -m ml.research.sweep_threshold_event --n 2` |
+| `plot_threshold_event.py` | 阈值 vs 信号簇曲线 | `python -m ml.research.plot_threshold_event --n 2` |
+| `grid_search_n_threshold.py` | N×阈值 网格搜索（label 口径 F1 选优） | `python -m ml.research.grid_search_n_threshold` |
+| `plot_n1_vs_n2.py` | N=1 vs N=2 曲线对比（label 口径） | `python -m ml.research.plot_n1_vs_n2` |
+
+> 历史教训：早期 `grid_search_n_threshold.py` / `plot_n1_vs_n2.py` 曾用"几何比对"（信号日 vs swing low 中心 ±k）口径，与训练 label 不一致，夸大低 N 的 Recall 误推"N=1 最优"。**已全部改回 label 口径**，结论修正为 N=2。详见 diagnosis.md §11。
 
 ## 核心方法论结论（2026-06-26 研究）
 

@@ -1,18 +1,14 @@
 """
-⚠️ 口径警告（2026-06-27）：本脚本用"几何比对"（信号日 vs swing low 中心 ±k）算 P/R，
-   与训练 label 列不一致。**门槛对比请用 ml/research/eval_by_label.py（label 口径，权威）。**
-   "ML 有效"定性结论成立，但具体 P/R 数字以 eval_by_label / diagnosis.md §11 为准。
-
 NDay 门槛遍历研究脚本 —— 以【抓底 Precision + Recall】为核心指标。
 
+口径说明（2026-06-27 核实）：本脚本 P/R 直接用 oos["label"] 列（训练口径=评估口径），
+口径正确，可作门槛对比依据。结论：N=2 候选池正样本率最高、@0.35 P/R 双优（详见 diagnosis.md §11）。
+
 背景：评判"抓底模型"不能用收益率（SPY 长牛，买越多越赚，收益率对抓底系统性不利）。
-正确尺子 = 抓底命中率(Precision) + 底部覆盖率(Recall)，真值 GT = sl_proximity 标签(swing low ± k 天)。
+正确尺子 = 抓底命中率(Precision) + 底部覆盖率(Recall)，真值 = sl_proximity 生成的 label 列。
 
 本脚本对每个 N ∈ sweep：
-  walk-forward 拼接样本外概率 → 对比 NDay 信号本身(基线) vs ML 放行后的 Precision/Recall。
-关键洞察：
-  - N 越大，单点抓底 Precision 越高，但候选池里的"真底总数"越少(门槛在源头过滤掉机会) → Recall 上限被压低。
-  - 因此最优 N 是 Precision/Recall 的偏好权衡，不是越大越好。
+  walk-forward 拼接样本外概率 → 用 label 列算阈值放行/TopK 的 Precision/Recall。
 
 用法：
   python -m ml.research.sweep_ndays_precision_recall                 # 默认遍历 N=1..5

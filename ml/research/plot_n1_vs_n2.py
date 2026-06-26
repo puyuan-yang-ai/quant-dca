@@ -1,10 +1,9 @@
 """
-⚠️ 口径警告（2026-06-27）：本脚本用"几何比对"口径，夸大了 N=1 的 Recall，结论已被推翻。
-   **正确结论：N=2 最优（用 ml/research/eval_by_label.py 的 label 口径验证）。** 详见 diagnosis.md §11。
-   本脚本仅作弯路记录，不可作决策依据。
+N=1 vs N=2 曲线对比图（label 口径：抓底 Precision/Recall/F1 + 信号簇 vs 阈值）。
 
-N=1 vs N=2 事件级曲线对比图（抓底 Precision/Recall/F1 + 信号簇 vs 阈值）。
-帮助在两个候选门槛间做最终决策。真底口径 swing_low(sl_n)±k，与 GT 一致。
+口径修正（2026-06-27）：P/R/F1 用训练 label 列（不再用几何比对）。
+label 口径下结论：N=2 略优于 N=1（@0.35 P/R 双优），详见 diagnosis.md §11。
+信号簇为口径无关指标，衡量连续加仓程度。
 
 用法: python -m ml.research.plot_n1_vs_n2
 输出: output/n1_vs_n2_event.png
@@ -30,7 +29,6 @@ plt.rcParams["axes.unicode_minus"] = False
 
 import ml.train_export as te
 from ml.labeling import run as run_labeling, load_spy
-from src.indicators import detect_swing_lows
 
 _CURRENT_N = {"n": 2}
 _orig = run_labeling
@@ -56,41 +54,33 @@ def _clusters(pos):
     return 1 + int((np.diff(a) > 1).sum())
 
 
-def _scan(n, sl_dates, k=3, thrs=None):
+def _scan(n, thrs=None):
+    """用 label 列算 P/R/F1 + 信号簇。"""
     _CURRENT_N["n"] = n
     wf = run_walkforward(version_tag=f"n1n2_{n}", n_folds=4)
     oos = wf["oos"].reset_index(drop=True)
-    od = pd.to_datetime(oos["date"])
+    y = oos["label"].values
     proba = oos["proba"].values
-    lo, hi = od.min(), od.max()
-    sl_in = sl_dates[(sl_dates >= lo) & (sl_dates <= hi)]
-    sl_arr = sl_in.values.astype("datetime64[D]")
-    total = len(sl_in)
+    total = int(y.sum())
     rows = []
     for thr in thrs:
         mask = proba > thr
-        sig = od[mask]
-        sig_arr = sig.values.astype("datetime64[D]")
         pos = np.where(mask)[0]
-        if len(sig_arr) == 0:
+        n_sig = int(mask.sum())
+        if n_sig == 0:
             rows.append((thr, 0, 0, np.nan, 0, 0)); continue
-        hit = sum(1 for d in sig_arr if (np.abs((sl_arr - d).astype(int)) <= k).any())
-        caught = sum(1 for b in sl_arr if (np.abs((sig_arr - b).astype(int)) <= k).any())
-        p = hit / len(sig_arr); r = caught / total
+        hit = int(y[mask].sum())
+        p = hit / n_sig; r = hit / total
         f1 = 2*p*r/(p+r) if (p+r) > 0 else 0
-        rows.append((thr, len(sig_arr), _clusters(pos), p, r, f1))
+        rows.append((thr, n_sig, _clusters(pos), p, r, f1))
     return pd.DataFrame(rows, columns=["thr", "n_sig", "cluster", "prec", "rec", "f1"]), total
 
 
 def run():
-    spy = load_spy()
-    sl = detect_swing_lows(spy["close"].tolist(),
-                           spy["date"].dt.strftime("%Y-%m-%d").tolist(), 7)
-    sl_dates = pd.to_datetime([s["date"] for s in sl])
     thrs = np.round(np.arange(0.15, 0.66, 0.05), 2)
 
-    d1, t1 = _scan(1, sl_dates, thrs=thrs)
-    d2, t2 = _scan(2, sl_dates, thrs=thrs)
+    d1, t1 = _scan(1, thrs=thrs)
+    d2, t2 = _scan(2, thrs=thrs)
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
     # 左: F1 / Precision / Recall
@@ -102,7 +92,7 @@ def run():
     ax1.plot(d2["thr"], d2["prec"]*100, "s:", color="darkorange", alpha=0.5, label="N=2 Precision")
     ax1.axvline(0.35, color="gray", ls=":", alpha=0.7)
     ax1.set_xlabel("概率阈值"); ax1.set_ylabel("%")
-    ax1.set_title("N=1 vs N=2 事件级 F1/Recall/Precision\n(实线F1 虚线Recall 点线Precision)")
+    ax1.set_title("N=1 vs N=2 F1/Recall/Precision (label口径)\n(实线F1 虚线Recall 点线Precision)")
     ax1.legend(fontsize=8, ncol=2); ax1.grid(alpha=0.3)
 
     # 右: 信号数 & 信号簇(加仓批次)
