@@ -19,6 +19,7 @@ S&P 500 Market Breadth 预计算脚本
 """
 import os
 import sys
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -50,6 +51,10 @@ OUTPUT_FILE = os.path.join(ROOT, 'data', 'sp500_breadth.csv')
 
 START_DATE = '1993-01-01'
 SMA_WINDOW = 20
+
+# 增量更新时，向前多拉这么多个自然日作为前置窗口，
+# 以保证 MA20 与连续低于 MA20 的计数器在新日期上收敛到正确值。
+INCREMENTAL_LOOKBACK_DAYS = 60
 
 
 def get_sp500_tickers():
@@ -83,11 +88,11 @@ def get_sp500_tickers():
     return tickers
 
 
-def fetch_close_data(tickers):
-    """批量拉取收盘价数据"""
-    print(f"正在从 yfinance 拉取 {len(tickers)} 只股票的历史数据（{START_DATE} 至今）...")
+def fetch_close_data(tickers, start_date=START_DATE):
+    """批量拉取收盘价数据（start_date 之后）"""
+    print(f"正在从 yfinance 拉取 {len(tickers)} 只股票的历史数据（{start_date} 至今）...")
     print("这可能需要几分钟，请耐心等待...")
-    data = yf.download(tickers, start=START_DATE, group_by='ticker', auto_adjust=True)
+    data = yf.download(tickers, start=start_date, group_by='ticker', auto_adjust=True)
 
     # 提取每只股票的 Close 列
     close_frames = {}
@@ -153,19 +158,50 @@ def print_yearly_stats(close_df, breadth):
               f"{year_breadth.min():>6.1f}  {year_breadth.max():>6.1f}")
 
 
-def main():
-    tickers = get_sp500_tickers()
-    close_df = fetch_close_data(tickers)
-    breadth, consecutive_breadth = calc_breadth(close_df)
-
-    print_yearly_stats(close_df, breadth)
-
-    # 保存 CSV
+def _build_result_df(breadth, consecutive_breadth) -> pd.DataFrame:
+    """把 breadth 计算结果拼成标准输出 DataFrame（date 为字符串）。"""
     result = pd.DataFrame({'date': breadth.index.strftime('%Y-%m-%d'), 'breadth': breadth.values})
     for key in ['breadth_c2', 'breadth_c3', 'breadth_c4', 'breadth_c5']:
         result[key] = consecutive_breadth[key].values
+    return result
+
+
+def main():
+    full = "--full" in sys.argv
+
+    existing = None
+    start_date = START_DATE
+    if not full and os.path.exists(OUTPUT_FILE):
+        existing = pd.read_csv(OUTPUT_FILE)
+        if not existing.empty:
+            last_date = pd.to_datetime(existing['date'].iloc[-1]).date()
+            if last_date >= date.today():
+                print(f"数据已是最新（{last_date}），无需更新。")
+                return
+            # 前置窗口：往前多拉若干天，保证 MA20 / 连续计数收敛
+            start_date = (last_date - timedelta(days=INCREMENTAL_LOOKBACK_DAYS)).strftime('%Y-%m-%d')
+            print(f"增量更新模式：现有数据截至 {last_date}，从 {start_date} 起拉取前置窗口。")
+    else:
+        print("全量模式：从 1993 年起重算全部历史。")
+
+    tickers = get_sp500_tickers()
+    close_df = fetch_close_data(tickers, start_date=start_date)
+    breadth, consecutive_breadth = calc_breadth(close_df)
+    new_result = _build_result_df(breadth, consecutive_breadth)
+
+    if existing is not None:
+        # 用新算的值覆盖重叠日期，并追加新日期；旧的非重叠历史原样保留
+        combined = pd.concat([existing, new_result], ignore_index=True)
+        combined = combined.drop_duplicates(subset=['date'], keep='last').sort_values('date')
+        added = len(combined) - len(existing)
+        result = combined
+        print(f"\n增量合并完成：新增/覆盖后总计 {len(result)} 行（净新增约 {added} 行）。")
+    else:
+        result = new_result
+        print_yearly_stats(close_df, breadth)
+
     result.to_csv(OUTPUT_FILE, index=False)
-    print(f"\n已保存到 {OUTPUT_FILE}")
+    print(f"已保存到 {OUTPUT_FILE}")
     print(f"共 {len(result)} 个交易日，范围 {result['date'].iloc[0]} ~ {result['date'].iloc[-1]}")
     print(f"字段：{', '.join(result.columns)}")
 

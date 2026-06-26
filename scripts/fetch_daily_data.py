@@ -15,6 +15,9 @@
 """
 import argparse
 import os
+import sys
+import time
+import random
 from pathlib import Path
 
 import pandas as pd
@@ -38,6 +41,39 @@ if _PROXY:
     os.environ.setdefault("HTTPS_PROXY", _PROXY)
     os.environ.setdefault("HTTP_PROXY", _PROXY)
 
+# 用 curl_cffi 模拟浏览器指纹，大幅降低雅虎对热门 ticker（如 SPY）的限流概率
+try:
+    from curl_cffi.requests import Session as CurlSession
+    _SESSION = CurlSession(impersonate="chrome")
+    _USE_CURL = True
+except ImportError:
+    _SESSION = None
+    _USE_CURL = False
+
+_MAX_RETRIES = 4
+_RETRY_BASE_WAIT = 8  # 秒
+
+
+def _download_with_retry(ticker: str, start: str) -> pd.DataFrame:
+    """带重试 + curl_cffi 指纹的 yf.download，缓解雅虎对 SPY 等的间歇限流。"""
+    kwargs = dict(start=start, auto_adjust=True, progress=False)
+    if _USE_CURL and _SESSION is not None:
+        kwargs["session"] = _SESSION
+
+    for attempt in range(1, _MAX_RETRIES + 1):
+        try:
+            raw = yf.download(ticker, **kwargs)
+            if not raw.empty:
+                return raw
+            print(f"  [retry] {ticker} 第 {attempt} 次返回空数据", file=sys.stderr)
+        except Exception as e:
+            print(f"  [retry] {ticker} 第 {attempt} 次失败：{e}", file=sys.stderr)
+        if attempt < _MAX_RETRIES:
+            wait = _RETRY_BASE_WAIT * attempt + random.uniform(1, 4)
+            print(f"  [retry] 等待 {wait:.1f}s 后重试…", file=sys.stderr)
+            time.sleep(wait)
+    return pd.DataFrame()
+
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "data"
@@ -55,9 +91,9 @@ def fetch_ticker(ticker: str):
     print(f"\n{'─'*50}")
     print(f"  拉取 {ticker} 日线数据（{cfg['start']} 至今）...")
 
-    raw = yf.download(ticker, start=cfg["start"], auto_adjust=True)
+    raw = _download_with_retry(ticker, start=cfg["start"])
     if raw.empty:
-        print(f"  错误：{ticker} 数据为空")
+        print(f"  错误：{ticker} 数据为空（重试后仍失败，保留原有文件不覆盖）")
         return
 
     # yfinance returns MultiIndex columns like ('Close', 'SPY'); flatten them
