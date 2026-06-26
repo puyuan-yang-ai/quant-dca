@@ -22,52 +22,73 @@ from pathlib import Path
 # ── DATA START ──  (AI fills this section; keep variable names exact)
 # ════════════════════════════════════════════════════════════════════
 
-REPORT_DATE = "20260608"
-REPORT_TYPE = "Weekly"
+REPORT_DATE = "20260622"          # YYYYMMDD from scenario filename
+REPORT_TYPE = "Weekly"            # "Monthly" or "Weekly"
 
-SA_LABEL = "A: 6/13 S/L Bottom -> Rally -> Jul Crest  (45%)"
+# Scenario A — main scenario (highest probability)
+SA_LABEL = "A: Early High -> Jun 26-29 Pullback  (52%)"
 SA_DATES = [
-    "2026-06-11", "2026-06-13", "2026-06-17", "2026-06-22",
-    "2026-06-29", "2026-07-06", "2026-07-17",
+    "2026-06-19", "2026-06-23", "2026-06-25", "2026-06-29",
+    "2026-07-06", "2026-07-18", "2026-07-24",
 ]
-SA_PRICES = [7407.0, 7300, 7450, 7425, 7400, 7500, 7725]
-SA_KEY_LABELS = {1: "S/L Low 140.8*\n7300", 2: "S/L High\n7450", 6: "PRIMARY CREST\n7725"}
+SA_PRICES = [7556.25, 7601, 7657, 7481, 7590, 7775, 7600]
+SA_KEY_LABELS = {1: "S/L High", 2: "Weekly resistance", 3: "CRD pullback", 5: "PRIMARY CREST"}
 
-SB_LABEL = "B: Deep Correction -> 7050-7150 -> CRD Bottom  (35%)"
+# Scenario B — most likely alternative
+SB_LABEL = "B: Breakout -> Jul 17-20 Crest  (33%)"
 SB_DATES = [
-    "2026-06-11", "2026-06-13", "2026-06-18", "2026-06-23",
-    "2026-06-29", "2026-07-06", "2026-07-15", "2026-07-20",
+    "2026-06-19", "2026-06-23", "2026-06-29", "2026-07-06",
+    "2026-07-18", "2026-07-24",
 ]
-SB_PRICES = [7407.0, 7375, 7350, 7200, 7100, 7125, 7400, 7500]
-SB_KEY_LABELS = {3: "Break 7230", 4: "Deep Low\n7100", 7: "Capped Rally"}
+SB_PRICES = [7556.25, 7660, 7620, 7750, 8000, 7800]
+SB_KEY_LABELS = {1: "Breakout 7659", 2: "Shallow CRD dip", 4: "Blowoff crest"}
 
+# CRD windows: (start_date, end_date, label, stars)  stars: 1/2/3
 CRDS = [
+    ("2026-06-16", "2026-06-17", "Jun 16-17 *", 1),
     ("2026-06-26", "2026-06-29", "Jun 26-29 *", 1),
     ("2026-07-05", "2026-07-07", "Jul 6 **", 2),
     ("2026-07-17", "2026-07-20", "Jul 17-20 ***", 3),
 ]
 
+# Solar-Lunar reversal dates: (date, bias)  bias: "Low" / "High" / "H/L"
 SOLAR_LUNAR = [
-    ("2026-06-13", "Low"),
-    ("2026-06-17", "High"),
+    ("2026-06-17", "H/L"),
+    ("2026-06-22", "High"),
+    ("2026-06-24", "High"),
+    ("2026-06-27", "Low"),
 ]
 
-SUPPORTS = [(7250, 7300), (7050, 7150)]
+# Support bands: (low_price, high_price)
+SUPPORTS = [(7479, 7482.5), (7390, 7400), (7354, 7360), (7232, 7240)]
 
-RESISTANCES = [(7632.25, "ATH 7632"), (7497, "TIP 7497"), (7700, "Target 7700")]
+# Resistance lines: (price, label)
+RESISTANCES = [
+    (7604, "Bear XO 7604"),
+    (7659, "Weekly resist 7659"),
+    (7700, "Target 7700"),
+    (7800, "Target 7800"),
+    (8050, "Extreme 8050"),
+]
 
+# Key historical markers: (date, price, label, marker_shape, color_key)
+#   color_key: "ATH" / "A" / "B"
 KEY_POINTS = [
-    ("2026-06-01", 7632.25, "ATH 7632", "*", "ATH"),
-    ("2026-06-09", 7247.25, "Panic Low\n7247", "v", "B"),
-    ("2026-05-19", 7354.25, "MCL 7354", "^", "A"),
+    ("2026-06-01", 7632.25, "ES ATH\n7632", "*", "ATH"),
+    ("2026-06-11", 7232.25, "Half-primary low\n7232", "v", "B"),
+    ("2026-06-19", 7556.25, "Latest close\n7556", "^", "A"),
 ]
 
+# Astro event labels (max 3): (date, y_position, text, color_key)
+#   color_key: "CRD_2" (gold) / "CRD_3" (red) / "CRD_1" (blue)
 ASTRO_LABELS = [
-    ("2026-06-13", 7180, "Venus->Leo\nS/L Low 140.8*", "CRD_1"),
-    ("2026-07-20", 7780, "Jup conv Ura/Nep/Plu\nPrimary Crest?", "CRD_3"),
+    ("2026-06-25", 7900, "Sun square Neptune\nCrest risk", "CRD_1"),
+    ("2026-06-29", 7820, "Mercury Rx\nCRD turn", "CRD_2"),
+    ("2026-07-19", 8120, "Jul 17-20 ***\nPrimary crest?", "CRD_3"),
 ]
 
-CURRENT_PHASE = "A: Correction Phase (6/05-6/13)"
+# Current phase label (shown next to TODAY marker)
+CURRENT_PHASE = "A: Push into Jun 26-29 CRD"
 
 # ════════════════════════════════════════════════════════════════════
 # ── DATA END ──  (DO NOT MODIFY ANYTHING BELOW THIS LINE)
