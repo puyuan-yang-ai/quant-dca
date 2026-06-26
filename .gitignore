@@ -40,3 +40,8 @@ Thumbs.db
 # Output (generated charts, can be regenerated)
 output/*.png
 output/*.html
+
+# 每日推理运行时产物（可重新生成，不进 git）
+logs/
+reports/
+output/daily_prediction.json

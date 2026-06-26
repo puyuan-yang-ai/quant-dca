@@ -36,12 +36,18 @@ def _bootstrap_auc_ci(y, proba, n_boot=2000, seed=42):
     return (float(np.percentile(aucs, 2.5)), float(np.percentile(aucs, 97.5)))
 
 
-def run_walkforward(version=None, n_folds=4, min_train=None):
-    version = version or ACTIVE_VERSION
+def run_walkforward(version=None, n_folds=4, min_train=None,
+                    method=None, labeling_kwargs=None, version_tag=None):
+    """method/labeling_kwargs 不传则用 versions.py 激活配置;
+    传入则覆盖标注方式(用于换 label 做对比实验)。version_tag 决定输出文件名后缀。"""
+    version = version_tag or version or ACTIVE_VERSION
     config = get_active_config()
     features_module = importlib.import_module(config["features_module"])
-    method = config["labeling"]["method"]
-    labeling_kwargs = {k: v for k, v in config["labeling"].items() if k != "method"}
+    if method is None:
+        method = config["labeling"]["method"]
+        labeling_kwargs = {k: v for k, v in config["labeling"].items() if k != "method"}
+    else:
+        labeling_kwargs = labeling_kwargs or {}
 
     data, feature_cols = _build_dataset(method, features_module, **labeling_kwargs)
     data = data.sort_values("date").reset_index(drop=True)

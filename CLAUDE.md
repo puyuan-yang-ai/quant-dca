@@ -16,7 +16,9 @@ SPY/SMH 多层次定投（DCA）回测系统 + ML Meta-Labeling 信号研究。�
 bash show_chart.sh                  # 交互式图表（K线+RSI/Breadth/VIX 副图，启 HTTP 服务）
 python run_experiments.py          # 4 阶段执行层参数优化（网格搜索）
 python scripts/compare_signals.py  # 信号策略比较（标准化执行，纯比较择时质量）
-python -m ml.run_mvp               # ML Meta-Labeling 一键运行（标注→特征→训练→评估）
+python -m ml.run_mvp               # ML Meta-Labeling 研究入口（标注→特征→训练→评估→画图，不存模型）
+python -m ml.train_export --holdout 0.2  # 全量训练并导出生产模型到 models/（含元数据 JSON）
+python -m ml.predict --json output/daily_prediction.json  # 每日推理：加载导出模型预测最新交易日
 python scripts/fetch_daily_data.py # 拉取日线数据（联网；其余 fetch_* 同理）
 ```
 
@@ -56,6 +58,11 @@ docs/tasks/                按日期前缀的历史任务记录与实验结论
 - **每日决策固定顺序**：档口 → 入场 → 仓位 → 止盈。
 - **引擎运行时自动计算 RSI v2 信号并存入 metrics**，无需手动注入。
 - **ML 当前激活版本 `v3`**（`ml/versions.py` 的 `ACTIVE_VERSION`），v3 实际标注方法为 `sl_proximity`；`run_mvp --method` 还支持 `relative_low`、`sl_multi` 等（比 versions.py 用到的多）。
+- **训练/推理已分离**：`ml/train_export.py` 全量训练并导出 `models/spy_nday5_<ver>.ubj` + 同名 `.json` 元数据（含 `feature_cols` 顺序契约、训练期、feature_importance、holdout 指标）；`ml/predict.py` 只加载模型对最新交易日推理，**不训练**，可独立部署到 Mac mini。模型文件进 git（约 140KB）。
+- **推理特征契约**：`predict.py` 会校验 `build_features` 返回的特征顺序与元数据 `feature_cols` 完全一致，不一致直接报错——改特征模块后必须重新 `train_export`。
+- **每天都出概率但区分信号日**：`predict.py` 用 `is_signal_day` 标注今天是否满足 NDay5；**非信号日的概率属模型未训练分布，仅供参考不可作交易依据**。
+- **信息泄漏审计结论（2026-06-20）**：features_v3 全部 21 个特征均为当天/历史窗口（rolling 右对齐、shift 正向），无未来泄漏；泄漏仅存在于 label/forward_return（训练用，推理不需要）。v3 样本外 AUC-ROC≈0.66（弱信号）。
+- **生产推理依赖**：venv 需装 `scikit-learn scipy xgboost`（曾缺失，2026-06-20 补装）。
 - **入场组合器类名为 `AndEntry` / `OrEntry`**（非 `CombinedAndEntry` / `CombinedOrEntry`，后者不存在）。
 - **方向性结论**：情绪信号中 VIX>30 入场综合最优、SafeHaven 垫底；最终锁定 `NoTakeProfit`。**需要精确数值/依据时，读 `.claude/docs/strategy-system.md` 及 `docs/tasks/` 对应目录。**
 - **Breadth 数据有幸存者偏差**（用当前 S&P 500 成分股回算历史），2020 后影响很小。

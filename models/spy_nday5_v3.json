@@ -1,0 +1,79 @@
+{
+  "version": "v3",
+  "model_file": "spy_nday5_v3.ubj",
+  "target": "SPY NDay5 回踩信号是否处于底部区域（SL邻近度标注）",
+  "trained_at_utc": "2026-06-20T11:14:54Z",
+  "features_module": "ml.features_v3",
+  "labeling": {
+    "method": "sl_proximity",
+    "sl_n": 7,
+    "k": 3
+  },
+  "model_params": {
+    "n_estimators": 100,
+    "max_depth": 4,
+    "learning_rate": 0.1
+  },
+  "feature_cols": [
+    "rsi_14",
+    "ema20_dist",
+    "breadth",
+    "breadth_c2",
+    "vix_regime",
+    "vix_above_200ma",
+    "consecutive_below_ema",
+    "sig_breadth",
+    "sig_breadth_consec",
+    "sig_breadth_div",
+    "sig_vix",
+    "rsi_minus_ma",
+    "drawdown_from_high",
+    "breadth_spread",
+    "breadth_delta_3d",
+    "sig_rsi_recent_3d",
+    "sig_breadth_recent_3d",
+    "sig_breadth_div_recent_5d",
+    "rsi_min_3d",
+    "breadth_min_3d",
+    "confluence_5d"
+  ],
+  "feature_importance": {
+    "rsi_14": 0.04279382899403572,
+    "ema20_dist": 0.048799995332956314,
+    "breadth": 0.044596970081329346,
+    "breadth_c2": 0.04253816604614258,
+    "vix_regime": 0.0731867104768753,
+    "vix_above_200ma": 0.05007469281554222,
+    "consecutive_below_ema": 0.06723033636808395,
+    "sig_breadth": 0.0,
+    "sig_breadth_consec": 0.05441516637802124,
+    "sig_breadth_div": 0.014238376170396805,
+    "sig_vix": 0.0,
+    "rsi_minus_ma": 0.036460500210523605,
+    "drawdown_from_high": 0.03947041556239128,
+    "breadth_spread": 0.0500146858394146,
+    "breadth_delta_3d": 0.04372365027666092,
+    "sig_rsi_recent_3d": 0.04877789318561554,
+    "sig_breadth_recent_3d": 0.02207198180258274,
+    "sig_breadth_div_recent_5d": 0.08616992831230164,
+    "rsi_min_3d": 0.1298997700214386,
+    "breadth_min_3d": 0.04903440177440643,
+    "confluence_5d": 0.05650248005986214
+  },
+  "n_train_samples": 1324,
+  "train_period": [
+    "1993-04-12",
+    "2026-04-06"
+  ],
+  "train_pos_rate": 0.3632930513595166,
+  "holdout_metrics": {
+    "auc_roc": 0.66280950603459,
+    "auc_pr": 0.5064475199343297,
+    "test_pos_rate": 0.35471698113207545,
+    "test_samples": 265,
+    "test_period": [
+      "2019-01-04",
+      "2026-04-06"
+    ]
+  }
+}
