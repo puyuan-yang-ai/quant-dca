@@ -33,9 +33,12 @@ from ml.versions import get_active_config, ACTIVE_VERSION
 MODELS_DIR = Path(__file__).parent.parent / "models"
 
 
-def _build_dataset(method: str, features_module, **labeling_kwargs):
-    """加载数据 → 生成信号 → 打标签 → 构造特征，返回 (data, feature_cols)"""
-    labeled = run_labeling(n_days=5, method=method, **labeling_kwargs)
+def _build_dataset(method: str, features_module, n_days: int = 5, **labeling_kwargs):
+    """加载数据 → 生成信号 → 打标签 → 构造特征，返回 (data, feature_cols)
+
+    n_days: NDay 信号门槛（连续低于 EMA20 的天数）。默认 5 向后兼容。
+    """
+    labeled = run_labeling(n_days=n_days, method=method, **labeling_kwargs)
     spy_df = load_spy()
     data, feature_cols = features_module.build_features(labeled, spy_df)
     data = data.dropna(subset=feature_cols).reset_index(drop=True)
@@ -67,14 +70,16 @@ def train_and_export(version: str = None, holdout: float = 0.0) -> dict:
         元数据字典
     """
     version = version or ACTIVE_VERSION
-    config = get_active_config()
+    from ml.versions import VERSIONS
+    config = VERSIONS[version]  # 按传入版本取配置（而非固定 ACTIVE_VERSION）
     import importlib
     features_module = importlib.import_module(config["features_module"])
 
     method = config["labeling"]["method"]
     labeling_kwargs = {k: v for k, v in config["labeling"].items() if k != "method"}
+    n_days = config.get("signal", {}).get("n_days", 5)
 
-    data, feature_cols = _build_dataset(method, features_module, **labeling_kwargs)
+    data, feature_cols = _build_dataset(method, features_module, n_days=n_days, **labeling_kwargs)
 
     X = data[feature_cols].values
     y = data["label"].values
@@ -111,8 +116,8 @@ def train_and_export(version: str = None, holdout: float = 0.0) -> dict:
     print(f"[Train] 全量训练完成：{len(data)} 样本，{len(feature_cols)} 特征")
 
     MODELS_DIR.mkdir(exist_ok=True)
-    model_path = MODELS_DIR / f"spy_nday5_{version}.ubj"
-    meta_path = MODELS_DIR / f"spy_nday5_{version}.json"
+    model_path = MODELS_DIR / f"spy_nday{n_days}_{version}.ubj"
+    meta_path = MODELS_DIR / f"spy_nday{n_days}_{version}.json"
 
     model.save_model(str(model_path))
 

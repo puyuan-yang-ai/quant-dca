@@ -56,6 +56,29 @@ VERSIONS = {
             "sl_n": 7,
             "k": 3,
         },
+        "signal": {
+            "n_days": 5,
+        },
+        "model": {
+            "n_estimators": 100,
+            "max_depth": 4,
+            "learning_rate": 0.1,
+        },
+        "metrics": {},
+    },
+    "v3_n2": {
+        "description": "V3 配置 + NDay 门槛降为 2 (抓底诊断结论, 2026-06-26)",
+        "features_module": "ml.features_v3",
+        "labeling": {
+            "method": "sl_proximity",
+            "sl_n": 7,
+            "k": 3,
+        },
+        # 信号门槛从 5 降到 2：诊断显示低门槛保留更多底部机会(Recall)，
+        # 抓底质量与 N=5 基本一致。详见 docs/tasks/260626-ml-bottom-catch-diagnosis/
+        "signal": {
+            "n_days": 2,
+        },
         "model": {
             "n_estimators": 100,
             "max_depth": 4,

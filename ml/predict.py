@@ -36,8 +36,10 @@ DATA_DIR = Path(__file__).parent.parent / "data"
 
 def load_model_and_meta(version: str):
     """加载模型文件与元数据，返回 (model, meta)"""
-    model_path = MODELS_DIR / f"spy_nday5_{version}.ubj"
-    meta_path = MODELS_DIR / f"spy_nday5_{version}.json"
+    from ml.versions import VERSIONS
+    n_days = VERSIONS.get(version, {}).get("signal", {}).get("n_days", 5)
+    model_path = MODELS_DIR / f"spy_nday{n_days}_{version}.ubj"
+    meta_path = MODELS_DIR / f"spy_nday{n_days}_{version}.json"
     if not model_path.exists():
         raise FileNotFoundError(
             f"模型文件不存在: {model_path}\n请先运行 python -m ml.train_export --version {version}"
@@ -143,12 +145,14 @@ def predict_latest(version: str = None) -> dict:
     # 贡献值在 margin / log-odds 空间：sum(contribs) + bias = 模型输出的 logit
     shap_contribs, shap_bias = _compute_shap(model, X, feature_cols)
 
-    # 今天是否满足 NDay5 信号条件
-    signal_series = generate_nday_signals(spy_df, n=5)
+    # 今天是否满足 NDay 信号条件（门槛取自版本配置，默认 5）
+    from ml.versions import VERSIONS
+    n_days = VERSIONS.get(version, {}).get("signal", {}).get("n_days", 5)
+    signal_series = generate_nday_signals(spy_df, n=n_days)
     signal_map = dict(zip(spy_df["date"], signal_series))
     is_signal_day = bool(signal_map.get(latest_date, False))
 
-    # 距离触发还差几天（consecutive_below_ema 当前值 vs 5）
+    # 距离触发还差几天（consecutive_below_ema 当前值 vs n_days）
     from ml.labeling import compute_backtest_ema_context
     ema_ctx = compute_backtest_ema_context(spy_df, ema_period=20)
     consec_below = int(ema_ctx["consecutive_below_ema"].iloc[-1]) if latest_date == spy_df["date"].iloc[-1] else None
@@ -163,7 +167,7 @@ def predict_latest(version: str = None) -> dict:
         "probability": proba,
         "is_signal_day": is_signal_day,
         "consecutive_below_ema": consec_below,
-        "days_to_signal": (5 - consec_below) if (consec_below is not None and consec_below < 5) else 0,
+        "days_to_signal": (n_days - consec_below) if (consec_below is not None and consec_below < n_days) else 0,
         "spy_close": float(latest["close"]) if "close" in latest else float(spy_df["close"].iloc[-1]),
         "feature_values": feature_values,
         "feature_importance": importance,
