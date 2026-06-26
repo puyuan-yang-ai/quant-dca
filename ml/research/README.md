@@ -6,11 +6,12 @@
 
 | 脚本 | 作用 | 运行 |
 |------|------|------|
+| ⭐ `eval_by_label.py` | **【权威】**用 label 列（训练口径=评估口径）评估抓底 P/R。**门槛决策以此为准** | `python -m ml.research.eval_by_label` |
 | `diag_threshold_quality.py` | 秒级静态诊断：各 NDay 门槛的信号数、信号质量、池内可分性 | `python -m ml.research.diag_threshold_quality` |
-| `sweep_ndays_precision_recall.py` | NDay 门槛遍历，以**抓底 Precision/Recall** 为指标（非收益率） | `python -m ml.research.sweep_ndays_precision_recall` |
-| `plot_precision_recall.py` | 画各 NDay 门槛的 P-R 权衡曲线 + F1/F2 综合分 | `python -m ml.research.plot_precision_recall` |
-| `sweep_threshold_event.py` | **事件级**阈值扫描：抓"独立局部低点"的 Precision/Recall + 信号簇 | `python -m ml.research.sweep_threshold_event --n 2` |
-| `plot_threshold_event.py` | 画 阈值 vs 事件P/R/信号簇 曲线图 | `python -m ml.research.plot_threshold_event --n 2` |
+| `plot_threshold_event.py` | 画 阈值 vs 信号簇 曲线（连续加仓洞察，口径无关部分有效） | `python -m ml.research.plot_threshold_event --n 2` |
+
+**⚠️ 以下脚本用了"几何比对"口径（与训练 label 不一致），仅作弯路记录，不可作门槛决策依据**（详见 `docs/tasks/260626-ml-bottom-catch-diagnosis/diagnosis.md` §11）：
+`sweep_ndays_precision_recall.py`、`plot_precision_recall.py`、`sweep_threshold_event.py`、`grid_search_n_threshold.py`、`plot_n1_vs_n2.py`
 
 ## 核心方法论结论（2026-06-26 研究）
 
@@ -18,7 +19,7 @@
 
 2. **ML 确实在抓底**：基线（NDay 信号本身）抓底命中率 ~38%，ML 高概率放行后提升到 46~58%（+8~21pp）。
 
-3. **门槛 N 的 Precision/Recall 权衡**：N 越大单点 Precision 越高，但候选池"真底总数"越少（N=1 有 653 个真底，N=5 只剩 298 个，门槛在源头过滤掉一半机会），Recall 上限被压低。**最优 N 取决于对 Precision/Recall 的偏好，不是越大越好。**
+3. **门槛 N 的最终结论（label 口径，权威）：N=2 最优**。候选池正样本率最高（41.2%），@阈值0.35 时 Precision 46.5% / Recall 80% 双优。⚠️ 早期用"几何比对"口径曾误推 N=1，已更正——**评估口径必须 = 训练 label 口径**（详见 diagnosis.md §11）。
 
 4. **XGBoost 无需手动特征分箱**：树模型本身在每个节点做最优切分（自适应分箱），手动分箱反而丢失分辨率。分箱主要对线性模型有用。
 

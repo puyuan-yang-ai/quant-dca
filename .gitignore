@@ -50,9 +50,16 @@ data/breadth_members/
 
 # 研究实验中间产物（可由 ml/research/ 脚本重新生成，不进 git）
 output/daily_prediction_*.json
+# 所有研究用 OOS 概率中间表（前缀带实验标签的，如 grid_/lab_/evallabel_/prcurve_/n1n2_ 等）
+output/oos_proba_grid_*.csv
+output/oos_proba_lab_*.csv
+output/oos_proba_evallabel_*.csv
 output/oos_proba_prcurve_*.csv
 output/oos_proba_pr_*.csv
 output/oos_proba_thr_*.csv
 output/oos_proba_sweep_*.csv
 output/oos_proba_prec_*.csv
+output/oos_proba_n1n2_*.csv
 output/sweep_*.csv
+output/grid_search_*.csv
+output/eval_by_label.csv

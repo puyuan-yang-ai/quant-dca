@@ -1,4 +1,8 @@
 """
+⚠️ 口径警告（2026-06-27）：本脚本用"几何比对"（信号日 vs swing low 中心 ±k）算 P/R，
+   与训练 label 列不一致。**门槛对比请用 ml/research/eval_by_label.py（label 口径，权威）。**
+   "ML 有效"定性结论成立，但具体 P/R 数字以 eval_by_label / diagnosis.md §11 为准。
+
 NDay 门槛遍历研究脚本 —— 以【抓底 Precision + Recall】为核心指标。
 
 背景：评判"抓底模型"不能用收益率（SPY 长牛，买越多越赚，收益率对抓底系统性不利）。
