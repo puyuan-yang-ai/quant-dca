@@ -91,9 +91,11 @@ class BacktestEngine:
 
             prev_close = self.data[i - 1]['close'] if i > 0 else day['close']
 
+            # 连续低于/高于 EMA 用【当日收盘】判定（2026-06-26 口径修正，
+            # 与按当日收盘决策的实盘一致；旧实现用 prev_close 会滞后一天）。
             if ema_val is not None:
                 dev = calc_deviation(day['close'], ema_val)
-                if prev_close < ema_val:
+                if day['close'] < ema_val:
                     consecutive_below += 1
                     consecutive_above = 0
                 else:

@@ -88,7 +88,7 @@ VERSIONS = {
     },
 }
 
-ACTIVE_VERSION = "v3"
+ACTIVE_VERSION = "v3_n2"
 
 
 def get_active_config() -> dict:

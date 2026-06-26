@@ -12,7 +12,7 @@
 
 输出说明：
   - probability:   模型给出的"该日处于底部区域"的概率
-  - is_signal_day: 今天是否满足 NDay5 条件（连续 5 天收盘在 EMA20 下方）
+  - is_signal_day: 今天是否满足 NDay-N 条件（连续 N 天收盘在 EMA20 下方，N 取自版本配置）
                    ⚠️ 模型只在信号日样本上训练。非信号日的概率仅供参考，
                    属于模型未见过的输入分布，不可作为交易依据。
   - data_freshness: 各数据源最新日期，用于判断是否有数据延迟（ffill 陈旧风险）
@@ -165,6 +165,7 @@ def predict_latest(version: str = None) -> dict:
         "predicted_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "as_of_date": latest_date.strftime("%Y-%m-%d"),
         "probability": proba,
+        "n_days": n_days,
         "is_signal_day": is_signal_day,
         "consecutive_below_ema": consec_below,
         "days_to_signal": (n_days - consec_below) if (consec_below is not None and consec_below < n_days) else 0,
@@ -184,12 +185,13 @@ def predict_latest(version: str = None) -> dict:
 def _print_report(r: dict):
     """终端可读输出"""
     print("\n" + "=" * 60)
-    print(f"  SPY NDay5 底部信号 — 每日预测 ({r['as_of_date']})")
+    nd = r.get("n_days", 5)
+    print(f"  SPY NDay{nd} 底部信号 — 每日预测 ({r['as_of_date']})")
     print("=" * 60)
 
-    signal_tag = "✅ 是信号日 (满足 NDay5)" if r["is_signal_day"] else "❌ 非信号日"
+    signal_tag = f"✅ 是信号日 (满足 NDay{nd})" if r["is_signal_day"] else "❌ 非信号日"
     print(f"  数据截止:     {r['as_of_date']}   SPY 收盘: {r['spy_close']:.2f}")
-    print(f"  NDay5 状态:   {signal_tag}")
+    print(f"  NDay{nd} 状态:   {signal_tag}")
     if not r["is_signal_day"] and r["consecutive_below_ema"] is not None:
         print(f"                连续低于 EMA20: {r['consecutive_below_ema']} 天 "
               f"(还差 {r['days_to_signal']} 天触发)")

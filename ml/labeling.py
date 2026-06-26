@@ -30,8 +30,10 @@ def compute_backtest_ema_context(df: pd.DataFrame, ema_period: int = 20) -> pd.D
     """
     复刻 BacktestEngine 的 EMA 入场上下文。
 
-    BacktestEngine 用当前 bar 的 EMA 和上一日收盘价更新 consecutive_below_ema。
-    ML 标签和特征必须使用同一语义，否则 NDayConfirmEntry 会出现日期漂移。
+    口径（2026-06-26 修正）：用【当日收盘】与【当日 EMA】比较来更新 consecutive_below_ema，
+    与按当日收盘决策的实盘一致（尾盘/按收盘价下单时，当日收盘已知）。
+    BacktestEngine 已同步为相同口径，保证标签与回测无日期漂移。
+    （旧实现用前一日收盘，会让连续天数滞后一天，与 TradingView 看图不一致。）
     """
     from src.indicators import calc_ema
 
@@ -45,12 +47,12 @@ def compute_backtest_ema_context(df: pd.DataFrame, ema_period: int = 20) -> pd.D
     above_count = 0
 
     for i, ema_val in enumerate(ema_values):
-        prev_close = close[i - 1] if i > 0 else close[i]
+        cur_close = close[i]
         if ema_val is None:
             below_count = 0
             above_count = 0
             is_below = False
-        elif prev_close < ema_val:
+        elif cur_close < ema_val:
             below_count += 1
             above_count = 0
             is_below = True

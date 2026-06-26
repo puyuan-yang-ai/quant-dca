@@ -2,7 +2,7 @@
   "version": "v3_n2",
   "model_file": "spy_nday2_v3_n2.ubj",
   "target": "SPY NDay5 回踩信号是否处于底部区域（SL邻近度标注）",
-  "trained_at_utc": "2026-06-26T16:51:47Z",
+  "trained_at_utc": "2026-06-26T17:10:27Z",
   "features_module": "ml.features_v3",
   "labeling": {
     "method": "sl_proximity",
@@ -38,42 +38,42 @@
     "confluence_5d"
   ],
   "feature_importance": {
-    "rsi_14": 0.04204990342259407,
-    "ema20_dist": 0.042594730854034424,
-    "breadth": 0.04572474583983421,
-    "breadth_c2": 0.037694286555051804,
-    "vix_regime": 0.045832086354494095,
-    "vix_above_200ma": 0.05552104488015175,
-    "consecutive_below_ema": 0.07210768014192581,
+    "rsi_14": 0.04444653540849686,
+    "ema20_dist": 0.04382640868425369,
+    "breadth": 0.04352211952209473,
+    "breadth_c2": 0.04986364394426346,
+    "vix_regime": 0.049495261162519455,
+    "vix_above_200ma": 0.05171478912234306,
+    "consecutive_below_ema": 0.05849869176745415,
     "sig_breadth": 0.0,
-    "sig_breadth_consec": 0.0558861568570137,
-    "sig_breadth_div": 0.027957826852798462,
+    "sig_breadth_consec": 0.0,
+    "sig_breadth_div": 0.018127689138054848,
     "sig_vix": 0.0,
-    "rsi_minus_ma": 0.04882710427045822,
-    "drawdown_from_high": 0.054243918508291245,
-    "breadth_spread": 0.05085095390677452,
-    "breadth_delta_3d": 0.08483843505382538,
-    "sig_rsi_recent_3d": 0.05593376234173775,
-    "sig_breadth_recent_3d": 0.02443249151110649,
-    "sig_breadth_div_recent_5d": 0.0630597323179245,
-    "rsi_min_3d": 0.07399882376194,
-    "breadth_min_3d": 0.05080796405673027,
-    "confluence_5d": 0.06763843446969986
+    "rsi_minus_ma": 0.054631683975458145,
+    "drawdown_from_high": 0.05828704312443733,
+    "breadth_spread": 0.06251434236764908,
+    "breadth_delta_3d": 0.06597975641489029,
+    "sig_rsi_recent_3d": 0.08373748511075974,
+    "sig_breadth_recent_3d": 0.0,
+    "sig_breadth_div_recent_5d": 0.12834607064723969,
+    "rsi_min_3d": 0.08233858644962311,
+    "breadth_min_3d": 0.059991806745529175,
+    "confluence_5d": 0.04467817395925522
   },
-  "n_train_samples": 2224,
+  "n_train_samples": 2286,
   "train_period": [
-    "1993-04-06",
-    "2026-04-06"
+    "1993-04-05",
+    "2026-04-02"
   ],
-  "train_pos_rate": 0.3880395683453237,
+  "train_pos_rate": 0.4116360454943132,
   "holdout_metrics": {
-    "auc_roc": 0.6392422010978711,
-    "auc_pr": 0.46940549486562566,
-    "test_pos_rate": 0.34606741573033706,
-    "test_samples": 445,
+    "auc_roc": 0.6407271241830065,
+    "auc_pr": 0.4806766892612417,
+    "test_pos_rate": 0.37117903930131,
+    "test_samples": 458,
     "test_period": [
-      "2018-12-18",
-      "2026-04-06"
+      "2018-11-20",
+      "2026-04-02"
     ]
   }
 }
