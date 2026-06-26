@@ -47,3 +47,12 @@ reports/
 output/daily_prediction.json
 tmp/
 data/breadth_members/
+
+# 研究实验中间产物（可由 ml/research/ 脚本重新生成，不进 git）
+output/daily_prediction_*.json
+output/oos_proba_prcurve_*.csv
+output/oos_proba_pr_*.csv
+output/oos_proba_thr_*.csv
+output/oos_proba_sweep_*.csv
+output/oos_proba_prec_*.csv
+output/sweep_*.csv
