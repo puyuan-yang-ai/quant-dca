@@ -99,6 +99,27 @@ def _data_freshness() -> dict:
     return freshness
 
 
+def _compute_shap(model, X: np.ndarray, feature_cols: list[str]) -> tuple[dict, float]:
+    """
+    计算单样本 TreeSHAP 归因，使用 xgboost 原生 pred_contribs（无需安装 shap 库）。
+
+    返回 (contribs_dict, bias)：
+      - contribs_dict: {特征名: SHAP 贡献值}，单位为 margin / log-odds 空间
+      - bias: 基准项（全样本期望 logit），sum(contribs) + bias = 该样本的 logit
+    正贡献 = 把"底部概率"往上推；负贡献 = 往下压。
+    """
+    import xgboost as xgb
+
+    booster = model.get_booster()
+    dmatrix = xgb.DMatrix(X, feature_names=list(feature_cols))
+    # pred_contribs=True 返回形状 (n_samples, n_features + 1)，最后一列是 bias
+    contribs = booster.predict(dmatrix, pred_contribs=True)
+    row = contribs[0]
+    bias = float(row[-1])
+    contribs_dict = {col: float(row[i]) for i, col in enumerate(feature_cols)}
+    return contribs_dict, bias
+
+
 def predict_latest(version: str = None) -> dict:
     """对最新交易日做预测，返回结果字典"""
     version = version or ACTIVE_VERSION
@@ -117,6 +138,10 @@ def predict_latest(version: str = None) -> dict:
 
     X = latest[feature_cols].values.astype(float).reshape(1, -1)
     proba = float(model.predict_proba(X)[0, 1])
+
+    # 逐样本 SHAP 归因（TreeSHAP，来自 xgboost 原生 pred_contribs，无需额外安装 shap 库）
+    # 贡献值在 margin / log-odds 空间：sum(contribs) + bias = 模型输出的 logit
+    shap_contribs, shap_bias = _compute_shap(model, X, feature_cols)
 
     # 今天是否满足 NDay5 信号条件
     signal_series = generate_nday_signals(spy_df, n=5)
@@ -142,6 +167,8 @@ def predict_latest(version: str = None) -> dict:
         "spy_close": float(latest["close"]) if "close" in latest else float(spy_df["close"].iloc[-1]),
         "feature_values": feature_values,
         "feature_importance": importance,
+        "shap_contribs": shap_contribs,
+        "shap_bias": shap_bias,
         "data_freshness": _data_freshness(),
         "train_period": meta.get("train_period"),
         "train_pos_rate": meta.get("train_pos_rate"),
@@ -186,6 +213,23 @@ def _print_report(r: dict):
         for name, val in top:
             cur = fv.get(name, float('nan'))
             print(f"    {name:<26} {val:>8.4f}  {cur:>10.3f}")
+
+    # 逐样本 SHAP 归因：本日各特征把"底部概率"往上推(+)还是往下压(-)
+    contribs = r.get("shap_contribs") or {}
+    if contribs:
+        bias = r.get("shap_bias", 0.0)
+        ordered = sorted(contribs.items(), key=lambda kv: abs(kv[1]), reverse=True)
+        total = sum(contribs.values())
+        print(f"\n  [SHAP 逐样本归因 — 对数几率(log-odds)空间，按影响力排序]")
+        print(f"    基准 bias = {bias:+.3f}   特征贡献合计 = {total:+.3f}   "
+              f"样本 logit = {bias + total:+.3f}")
+        print(f"    （正=推高底部概率  负=压低底部概率）")
+        print(f"    {'特征':<26} {'SHAP贡献':>10}  {'当前值':>10}")
+        print(f"    {'-'*50}")
+        for name, val in ordered[:10]:
+            cur = fv.get(name, float('nan'))
+            arrow = "↑" if val > 0 else ("↓" if val < 0 else " ")
+            print(f"    {name:<26} {val:>+10.4f}{arrow} {cur:>10.3f}")
     print("=" * 60)
 
 
