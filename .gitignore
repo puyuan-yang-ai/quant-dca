@@ -45,3 +45,5 @@ output/*.html
 logs/
 reports/
 output/daily_prediction.json
+tmp/
+data/breadth_members/

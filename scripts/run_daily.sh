@@ -2,7 +2,7 @@
 #
 # 每日推理总流程 — launchd 每天定时调用本脚本
 #
-# 流程: 激活环境 → 等网络就绪 → 拉数据 → 推理 → 出报告 → 推送
+# 流程: 激活环境 → 等网络就绪 → 增量更新数据 → 推理 → 出报告 → 推送
 # 设计要点:
 #   - launchd 启动时环境变量近乎为空, 因此全部用绝对路径、脚本内自定 PATH
 #   - Mac 刚唤醒可能网络未就绪, 故先探测网络 + 重试
@@ -10,6 +10,7 @@
 #   - 日志按日期落到 logs/
 #
 # 手动运行: bash scripts/run_daily.sh
+# 只生成本地结果、不发送成功报告: bash scripts/run_daily.sh --no-notify
 
 set -uo pipefail
 
@@ -20,6 +21,20 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV_PYTHON="${PROJECT_ROOT}/.venv/bin/python"
 LOG_DIR="${PROJECT_ROOT}/logs"
 JSON_OUT="${PROJECT_ROOT}/output/daily_prediction.json"
+SEND_SUCCESS_NOTIFY=1
+
+for arg in "$@"; do
+    case "${arg}" in
+        --no-notify)
+            SEND_SUCCESS_NOTIFY=0
+            ;;
+        *)
+            echo "未知参数: ${arg}" >&2
+            echo "用法: bash scripts/run_daily.sh [--no-notify]" >&2
+            exit 2
+            ;;
+    esac
+done
 
 # launchd 环境干净, 显式补 PATH (含 Homebrew 路径, 供 curl 等)
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
@@ -38,7 +53,7 @@ log() {
 alert() {
     local msg="$1"
     log "ALERT: ${msg}"
-    "${VENV_PYTHON}" -m ml.notify --text "🚨 每日推理失败: ${msg}" >> "${LOG_FILE}" 2>&1 || \
+    "${VENV_PYTHON}" -m ml.notify --text "[ALERT] 每日推理失败: ${msg}" >> "${LOG_FILE}" 2>&1 || \
         log "（告警推送本身也失败了, 仅记录日志）"
 }
 
@@ -56,6 +71,18 @@ wait_for_network() {
         i=$((i + 1))
     done
     return 1
+}
+
+run_with_retry() {
+    local desc="$1"
+    shift
+    log "${desc}..."
+    if "$@" >> "${LOG_FILE}" 2>&1; then
+        return 0
+    fi
+    log "${desc}失败, 5 秒后重试一次..."
+    sleep 5
+    "$@" >> "${LOG_FILE}" 2>&1
 }
 
 # ─────────────────────────────────────────────
@@ -77,16 +104,12 @@ if ! wait_for_network; then
     exit 1
 fi
 
-# 2) 拉数据 (失败重试一次)
-log "步骤 1/4: 拉取最新数据..."
-if ! "${VENV_PYTHON}" scripts/fetch_daily_data.py >> "${LOG_FILE}" 2>&1; then
-    log "拉数据失败, 5 秒后重试一次..."
-    sleep 5
-    if ! "${VENV_PYTHON}" scripts/fetch_daily_data.py >> "${LOG_FILE}" 2>&1; then
-        alert "拉取数据失败 (重试后仍失败)"
-        log "========== 异常结束 (fetch) =========="
-        exit 1
-    fi
+# 2) 统一增量更新模型所需数据：SPY / VIX / S&P 500 Breadth
+# 数据必须完整更新；失败则停止当天报告并推送告警。
+if ! run_with_retry "步骤 1/4: 增量更新市场数据" "${VENV_PYTHON}" scripts/update_market_data.py; then
+    alert "市场数据更新失败 (重试后仍失败)，已停止当天报告"
+    log "========== 异常结束 (update_market_data) =========="
+    exit 1
 fi
 
 # 3) 推理
@@ -106,9 +129,13 @@ if ! "${VENV_PYTHON}" -m ml.report --input "${JSON_OUT}" >> "${LOG_FILE}" 2>&1; 
 fi
 
 # 5) 推送 (推送失败不算致命, 但要记录)
-log "步骤 4/4: Telegram 推送..."
-if ! "${VENV_PYTHON}" -m ml.notify --json "${JSON_OUT}" >> "${LOG_FILE}" 2>&1; then
-    log "警告: 推送失败 (报告已生成, 可手动查看 reports/)"
+if [ "${SEND_SUCCESS_NOTIFY}" -eq 1 ]; then
+    log "步骤 4/4: Telegram 推送..."
+    if ! "${VENV_PYTHON}" -m ml.notify --json "${JSON_OUT}" >> "${LOG_FILE}" 2>&1; then
+        log "警告: 推送失败 (报告已生成, 可手动查看 reports/)"
+    fi
+else
+    log "步骤 4/4: 跳过 Telegram 成功推送 (--no-notify)"
 fi
 
 log "========== 每日推理完成 =========="

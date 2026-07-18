@@ -5,6 +5,7 @@ S&P 500 Market Breadth 预计算脚本
 
 用法：
   python scripts/fetch_breadth.py
+  python scripts/fetch_breadth.py --batch-size 25 --batch-timeout 120
 
 输出：
   data/sp500_breadth.csv
@@ -17,8 +18,13 @@ S&P 500 Market Breadth 预计算脚本
   使用当前成分股列表回算历史数据，存在幸存者偏差。
   早期年份有效股票数较少，但百分比仍有参考价值。
 """
+import argparse
+import json
 import os
+import subprocess
 import sys
+import tempfile
+import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -48,6 +54,7 @@ if _PROXY:
 # 项目根目录
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUTPUT_FILE = os.path.join(ROOT, 'data', 'sp500_breadth.csv')
+MEMBER_DIR = Path(ROOT) / 'data' / 'breadth_members'
 
 START_DATE = '1993-01-01'
 SMA_WINDOW = 20
@@ -55,6 +62,17 @@ SMA_WINDOW = 20
 # 增量更新时，向前多拉这么多个自然日作为前置窗口，
 # 以保证 MA20 与连续低于 MA20 的计数器在新日期上收敛到正确值。
 INCREMENTAL_LOOKBACK_DAYS = 60
+DEFAULT_BATCH_SIZE = 25
+DEFAULT_BATCH_TIMEOUT = 120
+DEFAULT_MAX_ATTEMPTS = 3
+DEFAULT_BACKOFF_SECONDS = 10
+
+YFINANCE_CACHE_DIR = Path(ROOT) / "tmp" / "yfinance-cache"
+YFINANCE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+try:
+    yf.set_tz_cache_location(str(YFINANCE_CACHE_DIR))
+except Exception as e:
+    print(f"警告：设置 yfinance cache 目录失败：{e}", file=sys.stderr)
 
 
 def get_sp500_tickers():
@@ -89,25 +107,196 @@ def get_sp500_tickers():
 
 
 def fetch_close_data(tickers, start_date=START_DATE):
-    """批量拉取收盘价数据（start_date 之后）"""
-    print(f"正在从 yfinance 拉取 {len(tickers)} 只股票的历史数据（{start_date} 至今）...")
-    print("这可能需要几分钟，请耐心等待...")
-    data = yf.download(tickers, start=start_date, group_by='ticker', auto_adjust=True)
-
-    # 提取每只股票的 Close 列
+    """从本地成员股缓存加载收盘价矩阵。"""
     close_frames = {}
+    missing = []
+    stale = []
+
+    for ticker in tickers:
+        path = _member_csv_path(ticker)
+        if not path.exists():
+            missing.append(ticker)
+            continue
+        df = pd.read_csv(path, parse_dates=['date'])
+        df = df[df['date'] >= pd.to_datetime(start_date)]
+        if len(df) <= SMA_WINDOW:
+            missing.append(ticker)
+            continue
+        close_frames[ticker] = df.set_index('date')['close'].sort_index()
+
+    if missing:
+        raise RuntimeError(
+            f"成员股缓存不完整，缺少/不足 {len(missing)} 只: {missing[:20]}"
+        )
+
+    close_df = pd.DataFrame(close_frames).sort_index()
+    if close_df.empty:
+        raise RuntimeError("成员股缓存为空，无法计算 Breadth")
+
+    target_latest = close_df.index.max()
+    for ticker, series in close_frames.items():
+        if series.dropna().empty or series.dropna().index.max() < target_latest:
+            stale.append(ticker)
+    if stale:
+        raise RuntimeError(
+            f"成员股缓存未全部更新到 {target_latest.date()}，落后 {len(stale)} 只: {stale[:20]}"
+        )
+
+    print(f"成功加载 {len(close_df.columns)} 只成员股缓存，最新日期 {target_latest.date()}")
+    return close_df
+
+
+def _safe_ticker_name(ticker: str) -> str:
+    return ticker.replace('/', '-').replace(':', '-')
+
+
+def _member_csv_path(ticker: str) -> Path:
+    return MEMBER_DIR / f"{_safe_ticker_name(ticker)}.csv"
+
+
+def _normalize_download(raw: pd.DataFrame, ticker: str) -> pd.DataFrame:
+    if raw.empty:
+        return pd.DataFrame()
+    if isinstance(raw.columns, pd.MultiIndex):
+        if ticker in raw.columns.get_level_values(0):
+            raw = raw[ticker]
+        else:
+            raw.columns = raw.columns.get_level_values(0)
+    raw = raw.reset_index()
+    raw.columns = [str(c).lower() for c in raw.columns]
+    for candidate in ('date', 'datetime', 'index'):
+        if candidate in raw.columns:
+            raw = raw.rename(columns={candidate: 'date'})
+            break
+    if 'date' not in raw.columns or 'close' not in raw.columns:
+        return pd.DataFrame()
+    result = raw[['date', 'close']].copy()
+    result['date'] = pd.to_datetime(result['date']).dt.normalize()
+    result['close'] = pd.to_numeric(result['close'], errors='coerce')
+    return result.dropna(subset=['date', 'close'])
+
+
+def _merge_member_cache(ticker: str, new_data: pd.DataFrame) -> None:
+    path = _member_csv_path(ticker)
+    if new_data.empty:
+        raise RuntimeError(f"{ticker} 下载结果为空")
+    if path.exists():
+        existing = pd.read_csv(path, parse_dates=['date'])
+        combined = pd.concat([existing, new_data], ignore_index=True)
+        combined = combined.drop_duplicates(subset=['date'], keep='last').sort_values('date')
+    else:
+        combined = new_data.sort_values('date')
+    combined.to_csv(path, index=False)
+
+
+def fetch_batch_child(tickers_path: str, start_date: str) -> int:
+    """子进程入口：更新一个 batch 的成员股缓存。"""
+    MEMBER_DIR.mkdir(parents=True, exist_ok=True)
+    tickers = json.loads(Path(tickers_path).read_text())
+    failed = []
+
     for ticker in tickers:
         try:
-            if ticker in data.columns.get_level_values(0):
-                series = data[ticker]['Close'].dropna()
-                if len(series) > SMA_WINDOW:
-                    close_frames[ticker] = series
-        except (KeyError, TypeError):
-            continue
+            raw = yf.download(
+                ticker,
+                start=start_date,
+                auto_adjust=True,
+                progress=False,
+                threads=False,
+                timeout=20,
+            )
+            df = _normalize_download(raw, ticker)
+            _merge_member_cache(ticker, df)
+            print(f"  {ticker}: {len(df)} rows")
+        except Exception as e:
+            failed.append((ticker, str(e)))
+            print(f"  {ticker}: 失败: {e}", file=sys.stderr)
 
-    close_df = pd.DataFrame(close_frames)
-    print(f"成功获取 {len(close_df.columns)} 只股票的有效数据")
-    return close_df
+    if failed:
+        print(f"batch 失败 {len(failed)} 只: {failed[:10]}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def _run_batch_with_retry(
+    batch_id: int,
+    tickers: list[str],
+    start_date: str,
+    batch_timeout: int,
+    max_attempts: int,
+    backoff_seconds: int,
+) -> None:
+    with tempfile.NamedTemporaryFile('w', suffix='.json', delete=False) as f:
+        json.dump(tickers, f)
+        tickers_path = f.name
+
+    try:
+        for attempt in range(1, max_attempts + 1):
+            print(f"批次 {batch_id}: {len(tickers)} 只，第 {attempt}/{max_attempts} 次尝试")
+            cmd = [
+                sys.executable,
+                __file__,
+                '--fetch-batch',
+                tickers_path,
+                '--start-date',
+                start_date,
+            ]
+            try:
+                result = subprocess.run(
+                    cmd,
+                    cwd=ROOT,
+                    text=True,
+                    capture_output=True,
+                    timeout=batch_timeout,
+                )
+            except subprocess.TimeoutExpired:
+                result = None
+                print(f"批次 {batch_id}: 超时 {batch_timeout}s", file=sys.stderr)
+
+            if result is not None:
+                if result.stdout:
+                    print(result.stdout, end='')
+                if result.stderr:
+                    print(result.stderr, end='', file=sys.stderr)
+                if result.returncode == 0:
+                    print(f"批次 {batch_id}: 成功")
+                    return
+
+            if attempt < max_attempts:
+                wait = backoff_seconds * (2 ** (attempt - 1))
+                print(f"批次 {batch_id}: 失败，等待 {wait}s 后重试")
+                time.sleep(wait)
+
+        raise RuntimeError(f"批次 {batch_id} 最终失败: {tickers}")
+    finally:
+        try:
+            os.unlink(tickers_path)
+        except OSError:
+            pass
+
+
+def update_member_caches(
+    tickers: list[str],
+    start_date: str,
+    batch_size: int,
+    batch_timeout: int,
+    max_attempts: int,
+    backoff_seconds: int,
+) -> None:
+    print(
+        f"更新成员股缓存：{len(tickers)} 只，batch_size={batch_size}, "
+        f"timeout={batch_timeout}s, attempts={max_attempts}"
+    )
+    for i in range(0, len(tickers), batch_size):
+        batch = tickers[i:i + batch_size]
+        _run_batch_with_retry(
+            batch_id=i // batch_size + 1,
+            tickers=batch,
+            start_date=start_date,
+            batch_timeout=batch_timeout,
+            max_attempts=max_attempts,
+            backoff_seconds=backoff_seconds,
+        )
 
 
 def calc_breadth(close_df):
@@ -167,11 +356,28 @@ def _build_result_df(breadth, consecutive_breadth) -> pd.DataFrame:
 
 
 def main():
-    full = "--full" in sys.argv
+    parser = argparse.ArgumentParser(description="增量更新 S&P 500 Breadth")
+    parser.add_argument("--full", action="store_true", help="全量重建成员股缓存和 Breadth")
+    parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE,
+                        help=f"成员股下载批大小，默认 {DEFAULT_BATCH_SIZE}")
+    parser.add_argument("--batch-timeout", type=int, default=DEFAULT_BATCH_TIMEOUT,
+                        help=f"每个批次子进程硬超时秒数，默认 {DEFAULT_BATCH_TIMEOUT}")
+    parser.add_argument("--max-attempts", type=int, default=DEFAULT_MAX_ATTEMPTS,
+                        help=f"每个批次最大尝试次数，默认 {DEFAULT_MAX_ATTEMPTS}")
+    parser.add_argument("--backoff-seconds", type=int, default=DEFAULT_BACKOFF_SECONDS,
+                        help=f"指数退避初始秒数，默认 {DEFAULT_BACKOFF_SECONDS}")
+    parser.add_argument("--fetch-batch", type=str, default=None,
+                        help=argparse.SUPPRESS)
+    parser.add_argument("--start-date", type=str, default=None,
+                        help=argparse.SUPPRESS)
+    args = parser.parse_args()
+
+    if args.fetch_batch:
+        sys.exit(fetch_batch_child(args.fetch_batch, args.start_date or START_DATE))
 
     existing = None
     start_date = START_DATE
-    if not full and os.path.exists(OUTPUT_FILE):
+    if not args.full and os.path.exists(OUTPUT_FILE):
         existing = pd.read_csv(OUTPUT_FILE)
         if not existing.empty:
             last_date = pd.to_datetime(existing['date'].iloc[-1]).date()
@@ -185,6 +391,14 @@ def main():
         print("全量模式：从 1993 年起重算全部历史。")
 
     tickers = get_sp500_tickers()
+    update_member_caches(
+        tickers=tickers,
+        start_date=start_date,
+        batch_size=args.batch_size,
+        batch_timeout=args.batch_timeout,
+        max_attempts=args.max_attempts,
+        backoff_seconds=args.backoff_seconds,
+    )
     close_df = fetch_close_data(tickers, start_date=start_date)
     breadth, consecutive_breadth = calc_breadth(close_df)
     new_result = _build_result_df(breadth, consecutive_breadth)

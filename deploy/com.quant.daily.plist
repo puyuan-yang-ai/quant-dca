@@ -1,10 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  launchd 定时配置 — 每天 08:00 (Mac mini 系统时区, 即北京时间) 运行 run_daily.sh
-
-  部署前必须替换两处路径中的 __USER__ 为你的 Mac 用户名:
-    例如用户名是 puyuan, 则把 /Users/__USER__/ 全部改成 /Users/puyuan/
-  并确认项目实际克隆在 /Users/<用户名>/quant-dca (否则一并改掉项目路径)
+  launchd 定时配置 — 每天 09:00 (Mac mini 系统时区, 即北京时间) 运行 run_daily.sh
 
   安装:
     cp deploy/com.quant.daily.plist ~/Library/LaunchAgents/
@@ -23,18 +19,18 @@
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>/Users/__USER__/quant-dca/scripts/run_daily.sh</string>
+        <string>/Users/puyuan/Projects/quant-dca/scripts/run_daily.sh</string>
     </array>
 
     <!-- 工作目录设为项目根 -->
     <key>WorkingDirectory</key>
-    <string>/Users/__USER__/quant-dca</string>
+    <string>/Users/puyuan/Projects/quant-dca</string>
 
-    <!-- 每天 08:00 触发 (Mac 睡眠期间错过会在唤醒后补跑) -->
+    <!-- 每天 09:00 触发 (Mac 睡眠期间错过会在唤醒后补跑) -->
     <key>StartCalendarInterval</key>
     <dict>
         <key>Hour</key>
-        <integer>8</integer>
+        <integer>9</integer>
         <key>Minute</key>
         <integer>0</integer>
     </dict>
@@ -45,9 +41,9 @@
 
     <!-- launchd 自身的标准输出/错误 (脚本内部另有按日期的详细日志) -->
     <key>StandardOutPath</key>
-    <string>/Users/__USER__/quant-dca/logs/launchd.out.log</string>
+    <string>/Users/puyuan/Projects/quant-dca/logs/launchd.out.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/__USER__/quant-dca/logs/launchd.err.log</string>
+    <string>/Users/puyuan/Projects/quant-dca/logs/launchd.err.log</string>
 
     <!-- 后台低优先级运行 -->
     <key>ProcessType</key>
