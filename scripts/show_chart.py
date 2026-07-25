@@ -15,6 +15,7 @@ from src.strategies.composable import ComposableStrategy
 from src.interactive_chart import show_interactive_chart
 from src.breadth_divergence import detect_breadth_divergence
 from src.indicators import detect_swing_lows
+from src.chan.czsc_chart_adapter import build_czsc_overlay
 import csv
 
 from experiments.configs import (
@@ -245,71 +246,118 @@ def main():
                         help='HTTP 服务端口（默认 9870）')
     parser.add_argument('--ml', action='store_true',
                         help='叠加 ML meta-labeling 信号标注')
+    parser.add_argument('--czsc', action='store_true',
+                        help='czsc 缠论专用视图：叠加分型/笔/中枢/一二三类买卖点，'
+                             '并隐藏交易/Swing Low/ML 等原有标记与副图，画面更干净')
     args = parser.parse_args()
 
     env = MARKET_ENVS[args.env]
     strat_config = STRATEGIES[args.strategy]
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-    print(f"策略：{strat_config['label']}")
-    print(f"环境：{env['label']}（{env['start']} ~ {env['end']}）")
+    if not args.czsc:
+        print(f"策略：{strat_config['label']}")
+        print(f"环境：{env['label']}（{env['start']} ~ {env['end']}）")
 
-    data = load_data(os.path.join(root, DATA_FILE), env['start'], env['end'])
-    smh_data = load_data(os.path.join(root, SMH_FILE), env['start'], env['end'])
-
-    # 加载 Breadth 数据（含连续弱势曲线）
-    breadth_data, breadth_consec = load_breadth(os.path.join(root, BREADTH_FILE), env['start'], env['end'])
-
-    # 检测 Swing Low — 使用 GT 标注的尺度 (SL7 only)
-    close_prices = [d['close'] for d in data]
-    dates = [d['date'] for d in data]
-    sl7_all = detect_swing_lows(close_prices, dates, 7)
-    print(f"GT Swing Low (SL7)：{len(sl7_all)} 个")
-    swing_lows = {'gt7': sl7_all}
-
-    # 计算 Breadth 背离
-    breadth_divergences = None
-    breadth_path = os.path.join(root, BREADTH_FILE)
-    spy_path = os.path.join(root, SPY_FILE)
-    if os.path.exists(breadth_path) and os.path.exists(spy_path):
-        result = detect_breadth_divergence(breadth_path, spy_path)
-        # 过滤到当前环境的日期范围
-        divs = [d for d in result['divergences']
-                if env['start'] <= d['date_b'] <= env['end']]
-        if divs:
-            breadth_divergences = divs
-            print(f"Breadth 背离：{len(divs)} 个信号")
-
-    strategy = ComposableStrategy(
-        tiers=strat_config['tiers'],
-        entry=strat_config['entry'],
-        position=strat_config['position'],
-        take_profit=strat_config['take_profit'],
-    )
-
-    print("执行回测...")
-    engine = BacktestEngine(data, smh_data, FEE_RATE, strategy)
-    metrics = engine.run()
-
-    print(f"总收益率：{metrics['total_return']*100:+.2f}%  "
-          f"夏普：{metrics['sharpe_ratio']:.2f}  "
-          f"最大回撤：{metrics['max_drawdown']*100:.1f}%")
-    print(f"交易记录：{len(metrics.get('trade_log', []))} 笔")
-
-    # ML 信号
+    # 叠加层默认全部关闭；czsc 模式下保持干净，仅画缠论结构
+    breadth_data = breadth_consec = breadth_divergences = swing_lows = None
+    czsc_data = None
     ml_signals = None
-    if args.ml:
-        print("加载 ML meta-labeling 信号...")
-        ml_signals = generate_ml_markers(env['start'], env['end'])
 
-    title = f"SPY DCA [{strat_config['label']}] — {env['label']}（{env['start']} ~ {env['end']}）"
+    if args.czsc:
+        # ── czsc 缠论专用视图：全周期 SPY，跳过回测，仅画缠论结构 ──
+        data = load_data(os.path.join(root, DATA_FILE))
+        print(f"SPY 全周期：{data[0]['date']} ~ {data[-1]['date']}，{len(data)} 根日线")
+        print("构建 czsc 缠论结构（全周期）...")
+        czsc_data = build_czsc_overlay(data, symbol='SPY')
+        if czsc_data:
+            n_bi = max(len(czsc_data['bi']) - 1, 0)
+            rt = czsc_data['counts']['realtime']
+            cf = czsc_data['counts']['confirmed']
+            print(f"czsc 结构 — 分型 {len(czsc_data['fractals'])} | 笔 {n_bi} | 中枢 {len(czsc_data['zs'])}")
+            print(f"czsc 买卖点 — 实时触发 {rt['survived']+rt['repaint']}（后确认 {rt['survived']} / "
+                  f"后被重绘 {rt['repaint']}）| 确认实战 {cf['buy']+cf['sell']}（买 {cf['buy']} / 卖 {cf['sell']}）| "
+                  f"确认延迟中位 {czsc_data['confirm_lag_median']} 交易日")
+        else:
+            print("czsc — 数据不足，未生成结构")
+        # GT 真值：标签 label=1 的候选日（绿色 GT 方块）+ SL7 摆动低点（橙色圆圈，参照）
+        close_prices = [d['close'] for d in data]
+        dates = [d['date'] for d in data]
+        sl7_all = detect_swing_lows(close_prices, dates, 7)
+        # GT 真值区：每个 SL7 低点【前后各 2 个交易 bar】都标 GT（与标签 k=2 口径一致；
+        # 中心那根是 SL7 本身，用橙色另标，故 GT 取 -2/-1/+1/+2 共 4 根）
+        date_to_idx = {d: i for i, d in enumerate(dates)}
+        gt_idx = set()
+        for s in sl7_all:
+            i = date_to_idx.get(s['date'])
+            if i is None:
+                continue
+            for j in (i - 2, i - 1, i + 1, i + 2):
+                if 0 <= j < len(dates):
+                    gt_idx.add(j)
+        gt1 = [{'date': dates[j]} for j in sorted(gt_idx)]
+        swing_lows = {'gt1': gt1, 'gt7': sl7_all}
+        print(f"GT 真值区(SL7 前后各2bar)：{len(gt1)} 个 | SL7 摆动低点：{len(sl7_all)} 个")
+        # 占位 metrics：czsc 视图不画 EMA / 不显示回测摘要
+        metrics = {'ema_series': [], 'trade_log': [], 'total_return': 0.0,
+                   'sharpe_ratio': 0.0, 'max_drawdown': 0.0, 'rsi_v2': {}}
+        title = f"SPY 缠论 (czsc) 全周期（{data[0]['date']} ~ {data[-1]['date']}）"
+    else:
+        data = load_data(os.path.join(root, DATA_FILE), env['start'], env['end'])
+        smh_data = load_data(os.path.join(root, SMH_FILE), env['start'], env['end'])
+
+        # 加载 Breadth 数据（含连续弱势曲线）
+        breadth_data, breadth_consec = load_breadth(os.path.join(root, BREADTH_FILE), env['start'], env['end'])
+
+        # 检测 Swing Low — 使用 GT 标注的尺度 (SL7 only)
+        close_prices = [d['close'] for d in data]
+        dates = [d['date'] for d in data]
+        sl7_all = detect_swing_lows(close_prices, dates, 7)
+        print(f"GT Swing Low (SL7)：{len(sl7_all)} 个")
+        swing_lows = {'gt7': sl7_all}
+
+        # 计算 Breadth 背离
+        breadth_path = os.path.join(root, BREADTH_FILE)
+        spy_path = os.path.join(root, SPY_FILE)
+        if os.path.exists(breadth_path) and os.path.exists(spy_path):
+            result = detect_breadth_divergence(breadth_path, spy_path)
+            # 过滤到当前环境的日期范围
+            divs = [d for d in result['divergences']
+                    if env['start'] <= d['date_b'] <= env['end']]
+            if divs:
+                breadth_divergences = divs
+                print(f"Breadth 背离：{len(divs)} 个信号")
+
+        strategy = ComposableStrategy(
+            tiers=strat_config['tiers'],
+            entry=strat_config['entry'],
+            position=strat_config['position'],
+            take_profit=strat_config['take_profit'],
+        )
+
+        print("执行回测...")
+        engine = BacktestEngine(data, smh_data, FEE_RATE, strategy)
+        metrics = engine.run()
+
+        print(f"总收益率：{metrics['total_return']*100:+.2f}%  "
+              f"夏普：{metrics['sharpe_ratio']:.2f}  "
+              f"最大回撤：{metrics['max_drawdown']*100:.1f}%")
+        print(f"交易记录：{len(metrics.get('trade_log', []))} 笔")
+
+        if args.ml:
+            print("加载 ML meta-labeling 信号...")
+            ml_signals = generate_ml_markers(env['start'], env['end'])
+
+        title = f"SPY DCA [{strat_config['label']}] — {env['label']}（{env['start']} ~ {env['end']}）"
+
     show_interactive_chart(data, metrics, title=title, port=args.port,
                            breadth_data=breadth_data,
                            breadth_divergences=breadth_divergences,
                            breadth_consec=breadth_consec,
                            swing_lows=swing_lows,
                            show_trades=False,
-                           ml_signals=ml_signals)
+                           ml_signals=ml_signals,
+                           czsc_data=czsc_data)
 
 
 if __name__ == '__main__':

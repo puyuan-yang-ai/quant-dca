@@ -30,6 +30,9 @@ def load_data(filepath, start_date=None, end_date=None):
                 'low': float(row['最低价']),
                 'close': float(row['收盘价'])
             }
+            # 成交量（若 CSV 提供）—— czsc 一买/一卖的量能背驰需要它
+            if row.get('成交量') not in (None, ''):
+                record['volume'] = float(row['成交量'])
             data.append(record)
     
     # 按日期排序
