@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import roc_auc_score, average_precision_score
 
-from ml.versions import get_active_config, ACTIVE_VERSION
+from ml.versions import get_active_config, ACTIVE_VERSION, VERSIONS
 from ml.train_export import _build_dataset, _make_model
 from ml.walk_forward import make_expanding_folds, purge_embargo_mask, uniqueness_weights
 
@@ -38,18 +38,23 @@ def _bootstrap_auc_ci(y, proba, n_boot=2000, seed=42):
 
 def run_walkforward(version=None, n_folds=4, min_train=None,
                     method=None, labeling_kwargs=None, version_tag=None):
-    """method/labeling_kwargs 不传则用 versions.py 激活配置;
-    传入则覆盖标注方式(用于换 label 做对比实验)。version_tag 决定输出文件名后缀。"""
-    version = version_tag or version or ACTIVE_VERSION
-    config = get_active_config()
+    """按版本参数化:version 命中 VERSIONS 时取该版本配置(features_module + labeling +
+    signal.n_days + model),否则用激活配置;method/labeling_kwargs 传入则覆盖标注方式。
+    version_tag 决定输出文件名后缀。"""
+    cfg_version = version if (version in VERSIONS) else ACTIVE_VERSION
+    config = VERSIONS[cfg_version]
+    out_version = version_tag or version or ACTIVE_VERSION
     features_module = importlib.import_module(config["features_module"])
+    signal_cfg = config.get("signal", {})
+    n_days = signal_cfg.get("n_days", 5)
     if method is None:
         method = config["labeling"]["method"]
         labeling_kwargs = {k: v for k, v in config["labeling"].items() if k != "method"}
     else:
         labeling_kwargs = labeling_kwargs or {}
 
-    data, feature_cols = _build_dataset(method, features_module, **labeling_kwargs)
+    data, feature_cols = _build_dataset(method, features_module, n_days=n_days,
+                                        signal_cfg=signal_cfg, **labeling_kwargs)
     data = data.sort_values("date").reset_index(drop=True)
     dates = pd.to_datetime(data["date"])
     X = data[feature_cols].values
@@ -97,7 +102,7 @@ def run_walkforward(version=None, n_folds=4, min_train=None,
     ci = _bootstrap_auc_ci(yv, pv)
 
     OUTPUT_DIR.mkdir(exist_ok=True)
-    oos_csv_path = OUTPUT_DIR / f"oos_proba_{version}.csv"
+    oos_csv_path = OUTPUT_DIR / f"oos_proba_{out_version}.csv"
     oos_valid.to_csv(oos_csv_path, index=False)
 
     print("\n" + "=" * 56)

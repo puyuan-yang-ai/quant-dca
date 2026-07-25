@@ -20,7 +20,7 @@ from src.modules.position import FixedPyramid
 from src.modules.take_profit import NoTakeProfit
 from src.modules.entry import NDayConfirmEntry, OOSProbaEntry
 from experiments.configs import DATA_FILE, SMH_FILE, FEE_RATE
-from ml.versions import ACTIVE_VERSION
+from ml.versions import ACTIVE_VERSION, VERSIONS
 
 ROOT = Path(__file__).parent.parent
 OUTPUT_DIR = ROOT / "output"
@@ -53,6 +53,8 @@ def _run_engine(entry, start, end):
 
 def run_economics(version=None):
     version = version or ACTIVE_VERSION
+    # A 基准的候选全集 = 该版本自身的 NDay 门槛
+    n_days = VERSIONS.get(version, {}).get("signal", {}).get("n_days", 5)
     oos_csv = OUTPUT_DIR / f"oos_proba_{version}.csv"
     if not oos_csv.exists():
         raise FileNotFoundError(f"先跑 ml.eval_walkforward 生成 {oos_csv}")
@@ -78,8 +80,8 @@ def run_economics(version=None):
     pass_fi_strs = _to_engine_date_strings(pass_fi)
     pass_05_strs = _to_engine_date_strings(pass_05)
 
-    # --- 三组引擎回测 ---
-    eng_A = _run_engine(NDayConfirmEntry(n_days=5), start, end)
+    # --- 三组引擎回测（A 基准用该版本自身的 NDay 门槛）---
+    eng_A = _run_engine(NDayConfirmEntry(n_days=n_days), start, end)
     eng_Bfi = _run_engine(OOSProbaEntry(pass_fi_strs), start, end)
     eng_B05 = _run_engine(OOSProbaEntry(pass_05_strs), start, end)
 
@@ -121,7 +123,7 @@ def run_economics(version=None):
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
     fig.suptitle(f"Economic Backtest A vs B (OOS {start}~{end})", fontsize=13, fontweight="bold")
     ax = axes[0]
-    ax.plot(eng_A["dates"], eng_A["daily_values"], label=f"A all-NDay5 (buys={eng_A.get('buy_count',0)})")
+    ax.plot(eng_A["dates"], eng_A["daily_values"], label=f"A all-NDay{n_days} (buys={eng_A.get('buy_count',0)})")
     ax.plot(eng_Bfi["dates"], eng_Bfi["daily_values"], label=f"B fold-thr (buys={eng_Bfi.get('buy_count',0)})")
     ax.plot(eng_B05["dates"], eng_B05["daily_values"], label=f"B thr=0.5 (buys={eng_B05.get('buy_count',0)})")
     ax.set_title("Equity Curve"); ax.legend(); ax.set_xticks([])
@@ -140,7 +142,7 @@ def run_economics(version=None):
     print(f"  经济回测 A vs B (OOS {start} ~ {end})")
     print("=" * 60)
     print(f"  {'组':<22}{'Sharpe':>9}{'MaxDD':>9}{'总收益':>9}{'买入数':>8}")
-    for name, m in [("A 全NDay5", eng_A), ("B 折内阈值", eng_Bfi), ("B 阈值0.5", eng_B05)]:
+    for name, m in [(f"A 全NDay{n_days}", eng_A), ("B 折内阈值", eng_Bfi), ("B 阈值0.5", eng_B05)]:
         print(f"  {name:<22}{m['sharpe_ratio']:>9.2f}{m['max_drawdown']*100:>8.1f}%"
               f"{m['total_return']*100:>8.1f}%{m.get('buy_count',0):>8}")
     print("-" * 60)

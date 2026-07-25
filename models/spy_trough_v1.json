@@ -1,0 +1,85 @@
+{
+  "version": "v5_pa",
+  "model_name": "spy_trough_v1",
+  "model_file": "spy_trough_v1.ubj",
+  "target": "SPY 底部识别：初级信号[nearbottom_n30p5] + 标签[sl_proximity {'method': 'sl_proximity', 'sl_n': 7, 'k': 2}]",
+  "trained_at_utc": "2026-06-29T01:21:18Z",
+  "features_module": "ml.features_v3",
+  "signal": {
+    "type": "nearbottom",
+    "n": 30,
+    "pct": 0.05
+  },
+  "labeling": {
+    "method": "sl_proximity",
+    "sl_n": 7,
+    "k": 2
+  },
+  "model_params": {
+    "n_estimators": 100,
+    "max_depth": 4,
+    "learning_rate": 0.1
+  },
+  "feature_cols": [
+    "rsi_14",
+    "ema20_dist",
+    "breadth",
+    "breadth_c2",
+    "vix_regime",
+    "vix_above_200ma",
+    "consecutive_below_ema",
+    "sig_breadth",
+    "sig_breadth_consec",
+    "sig_breadth_div",
+    "sig_vix",
+    "rsi_minus_ma",
+    "drawdown_from_high",
+    "breadth_spread",
+    "breadth_delta_3d",
+    "sig_rsi_recent_3d",
+    "sig_breadth_recent_3d",
+    "sig_breadth_div_recent_5d",
+    "rsi_min_3d",
+    "breadth_min_3d",
+    "confluence_5d"
+  ],
+  "feature_importance": {
+    "rsi_14": 0.04474005848169327,
+    "ema20_dist": 0.22736817598342896,
+    "breadth": 0.03655804693698883,
+    "breadth_c2": 0.07525517046451569,
+    "vix_regime": 0.042844925075769424,
+    "vix_above_200ma": 0.043175261467695236,
+    "consecutive_below_ema": 0.04607972875237465,
+    "sig_breadth": 0.0,
+    "sig_breadth_consec": 0.0,
+    "sig_breadth_div": 0.020500851795077324,
+    "sig_vix": 0.0,
+    "rsi_minus_ma": 0.05499778687953949,
+    "drawdown_from_high": 0.0561806820333004,
+    "breadth_spread": 0.042134542018175125,
+    "breadth_delta_3d": 0.07309284061193466,
+    "sig_rsi_recent_3d": 0.0,
+    "sig_breadth_recent_3d": 0.0,
+    "sig_breadth_div_recent_5d": 0.08472416549921036,
+    "rsi_min_3d": 0.06867079436779022,
+    "breadth_min_3d": 0.046390194445848465,
+    "confluence_5d": 0.037286773324012756
+  },
+  "n_train_samples": 4272,
+  "train_period": [
+    "1993-02-26",
+    "2026-04-07"
+  ],
+  "train_pos_rate": 0.30337078651685395,
+  "holdout_metrics": {
+    "auc_roc": 0.7583690438119604,
+    "auc_pr": 0.5455423684174572,
+    "test_pos_rate": 0.30994152046783624,
+    "test_samples": 855,
+    "test_period": [
+      "2018-05-03",
+      "2026-04-07"
+    ]
+  }
+}

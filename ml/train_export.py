@@ -33,12 +33,13 @@ from ml.versions import get_active_config, ACTIVE_VERSION
 MODELS_DIR = Path(__file__).parent.parent / "models"
 
 
-def _build_dataset(method: str, features_module, n_days: int = 5, **labeling_kwargs):
+def _build_dataset(method: str, features_module, n_days: int = 5, signal_cfg: dict = None, **labeling_kwargs):
     """加载数据 → 生成信号 → 打标签 → 构造特征，返回 (data, feature_cols)
 
     n_days: NDay 信号门槛（连续低于 EMA20 的天数）。默认 5 向后兼容。
+    signal_cfg: 初级信号配置（如 {'type':'nearbottom',...} 走路径A）。
     """
-    labeled = run_labeling(n_days=n_days, method=method, **labeling_kwargs)
+    labeled = run_labeling(n_days=n_days, method=method, signal_cfg=signal_cfg, **labeling_kwargs)
     spy_df = load_spy()
     data, feature_cols = features_module.build_features(labeled, spy_df)
     data = data.dropna(subset=feature_cols).reset_index(drop=True)
@@ -57,7 +58,7 @@ def _make_model(model_cfg: dict) -> XGBClassifier:
     )
 
 
-def train_and_export(version: str = None, holdout: float = 0.0) -> dict:
+def train_and_export(version: str = None, holdout: float = 0.0, model_name: str = None) -> dict:
     """
     全量训练并导出模型 + 元数据。
 
@@ -77,9 +78,17 @@ def train_and_export(version: str = None, holdout: float = 0.0) -> dict:
 
     method = config["labeling"]["method"]
     labeling_kwargs = {k: v for k, v in config["labeling"].items() if k != "method"}
-    n_days = config.get("signal", {}).get("n_days", 5)
+    signal_cfg = config.get("signal", {})
+    n_days = signal_cfg.get("n_days", 5)
 
-    data, feature_cols = _build_dataset(method, features_module, n_days=n_days, **labeling_kwargs)
+    # 初级信号标签（用于文件名/元数据，避免近底信号被误标成 ndayN）
+    if signal_cfg.get("type") == "nearbottom":
+        sig_tag = f"nearbottom_n{int(signal_cfg.get('n', 20))}p{int(round(signal_cfg.get('pct', 0.03) * 100))}"
+    else:
+        sig_tag = f"nday{n_days}"
+
+    data, feature_cols = _build_dataset(method, features_module, n_days=n_days,
+                                        signal_cfg=signal_cfg, **labeling_kwargs)
 
     X = data[feature_cols].values
     y = data["label"].values
@@ -116,8 +125,10 @@ def train_and_export(version: str = None, holdout: float = 0.0) -> dict:
     print(f"[Train] 全量训练完成：{len(data)} 样本，{len(feature_cols)} 特征")
 
     MODELS_DIR.mkdir(exist_ok=True)
-    model_path = MODELS_DIR / f"spy_nday{n_days}_{version}.ubj"
-    meta_path = MODELS_DIR / f"spy_nday{n_days}_{version}.json"
+    # 模型名：优先用传入的 model_name(独特命名) → 否则 config.codename → 否则 spy_<sig_tag>_<version>
+    name = model_name or config.get("codename") or f"spy_{sig_tag}_{version}"
+    model_path = MODELS_DIR / f"{name}.ubj"
+    meta_path = MODELS_DIR / f"{name}.json"
 
     model.save_model(str(model_path))
 
@@ -128,10 +139,12 @@ def train_and_export(version: str = None, holdout: float = 0.0) -> dict:
 
     meta = {
         "version": version,
+        "model_name": name,
         "model_file": model_path.name,
-        "target": "SPY NDay5 回踩信号是否处于底部区域（SL邻近度标注）",
+        "target": f"SPY 底部识别：初级信号[{sig_tag}] + 标签[{method} {config['labeling']}]",
         "trained_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "features_module": config["features_module"],
+        "signal": signal_cfg,
         "labeling": config["labeling"],
         "model_params": config["model"],
         # 推理契约：必须按此顺序构造特征列
@@ -169,12 +182,14 @@ def main():
                         help="版本号（默认用 versions.py 的 ACTIVE_VERSION）")
     parser.add_argument("--holdout", type=float, default=0.0,
                         help="留出最近比例做样本外评估（如 0.2），仅记录指标，仍全量训练导出")
+    parser.add_argument("--name", type=str, default=None,
+                        help="自定义模型名（落盘文件名）；不传则用 config.codename 或 spy_<sig>_<version>")
     args = parser.parse_args()
 
     print("=" * 55)
     print("  训练并导出生产推理模型")
     print("=" * 55)
-    train_and_export(version=args.version, holdout=args.holdout)
+    train_and_export(version=args.version, holdout=args.holdout, model_name=args.name)
     print("\n" + "=" * 55)
     print("  完成。将 models/ 目录拷贝到 Mac mini 即可用 predict.py 推理。")
     print("=" * 55)

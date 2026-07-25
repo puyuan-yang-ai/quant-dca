@@ -83,6 +83,18 @@ def generate_nday_signals(df: pd.DataFrame, n: int = 5, ema_period: int = 20) ->
     return ema_context["consecutive_below_ema"] >= n
 
 
+def generate_nearbottom_signals(df: pd.DataFrame, n: int = 20, pct: float = 0.03) -> pd.Series:
+    """对称"近底"初级信号（路径 A）：收盘距【近 n 日最低价】不超过 pct。
+
+    用滚动低点邻近度（因果，仅用过去 n 根）对称覆盖底部两侧——下跌接近、谷底、
+    刚反弹几根都会命中。比"跌破均线"更聚焦"近期低位"，且比标签(近 SL7 底)更松，
+    保证候选里正负混合、ML 有事可学。
+    """
+    low = df["low"].astype(float)
+    roll_min = low.rolling(n, min_periods=1).min()
+    return df["close"].astype(float) <= roll_min * (1 + pct)
+
+
 def create_labels(df: pd.DataFrame, signal: pd.Series, horizon: int = 5) -> pd.DataFrame:
     """
     Fixed Horizon Labeling:
@@ -217,16 +229,20 @@ def create_labels_sl_proximity(
 ) -> pd.DataFrame:
     """
     Swing Low Proximity Labeling:
-    对每个信号日 t，找到最近的 SL(sl_n)，如果距离 <= k 天则 label=1。
+    对每个信号日 t，找到最近的 SL(sl_n)，如果距离 <= k 个【交易 bar】则 label=1。
     直接回答"信号日是否在底部区域"。
     forward_return = 20天远期收益（用于事后验证信号质量）。
+
+    口径（2026-06-28 修正）：距离以【交易 bar(K线序号差)】度量，而非日历日，
+    与系统其余按 bar 的逻辑统一。k=2 表示 SL ±2 bar（5 根窗口）。
     """
     from src.indicators import detect_swing_lows
 
     close_prices = df["close"].tolist()
     dates_list = df["date"].dt.strftime("%Y-%m-%d").tolist()
     swing_lows = detect_swing_lows(close_prices, dates_list, sl_n)
-    sl_dates = pd.to_datetime([s["date"] for s in swing_lows])
+    sl_date_set = set(s["date"] for s in swing_lows)
+    sl_positions = np.array([i for i, ds in enumerate(dates_list) if ds in sl_date_set])
 
     close = df["close"].values
     dates = df["date"].values
@@ -235,14 +251,11 @@ def create_labels_sl_proximity(
     records = []
     for idx in signal_idx:
         entry_price = close[idx]
-        signal_date = pd.Timestamp(dates[idx])
 
-        if len(sl_dates) == 0:
+        if len(sl_positions) == 0:
             continue
 
-        diffs = (sl_dates - signal_date).days
-        abs_diffs = np.abs(diffs)
-        nearest_dist = abs_diffs.min()
+        nearest_dist = int(np.abs(sl_positions - idx).min())  # 交易 bar 距离
 
         fwd_20 = close[idx + 20] / entry_price - 1 if idx + 20 < len(df) else np.nan
 
@@ -272,18 +285,20 @@ def create_labels_sl_multi(
     """
     Multi-scale Swing Low Labeling:
     对每个信号日，检查多个尺度的 SL（如 SL5 和 SL7），
-    只要任一尺度的最近 SL 距离 <= k 天，就 label=1。
+    只要任一尺度的最近 SL 距离 <= k 个【交易 bar】，就 label=1。
+
+    口径（2026-06-28 修正）：距离以【交易 bar(K线序号差)】度量，而非日历日。
     """
     from src.indicators import detect_swing_lows
 
     close_prices = df["close"].tolist()
     dates_list = df["date"].dt.strftime("%Y-%m-%d").tolist()
 
-    all_sl_dates = []
+    all_sl_date_set = set()
     for n in sl_ns:
         sls = detect_swing_lows(close_prices, dates_list, n)
-        all_sl_dates.extend([s["date"] for s in sls])
-    all_sl_dates = pd.to_datetime(sorted(set(all_sl_dates)))
+        all_sl_date_set.update(s["date"] for s in sls)
+    all_sl_positions = np.array([i for i, ds in enumerate(dates_list) if ds in all_sl_date_set])
 
     close = df["close"].values
     dates = df["date"].values
@@ -292,14 +307,11 @@ def create_labels_sl_multi(
     records = []
     for idx in signal_idx:
         entry_price = close[idx]
-        signal_date = pd.Timestamp(dates[idx])
 
-        if len(all_sl_dates) == 0:
+        if len(all_sl_positions) == 0:
             continue
 
-        diffs = (all_sl_dates - signal_date).days
-        abs_diffs = np.abs(diffs)
-        nearest_dist = abs_diffs.min()
+        nearest_dist = int(np.abs(all_sl_positions - idx).min())  # 交易 bar 距离
 
         fwd_20 = close[idx + 20] / entry_price - 1 if idx + 20 < len(df) else np.nan
 
@@ -320,14 +332,25 @@ def create_labels_sl_multi(
     return labeled
 
 
-def run(n_days: int = 5, method: str = "sl_proximity", **kwargs) -> pd.DataFrame:
+def run(n_days: int = 5, method: str = "sl_proximity", signal_cfg: dict = None, **kwargs) -> pd.DataFrame:
     """
     完整流程：加载数据 → 生成信号 → 打标签
 
     method: 'fixed_horizon' | 'triple_barrier' | 'relative_low' | 'sl_proximity'
+    signal_cfg: 初级信号配置。{'type':'nearbottom','n':20,'pct':0.03} 用对称近底规则(路径A)；
+                否则用 NDay 门槛（n_days 或 signal_cfg['n_days']）。
     """
     df = load_spy()
-    signal = generate_nday_signals(df, n=n_days)
+    signal_cfg = signal_cfg or {}
+    if signal_cfg.get("type") == "nearbottom":
+        nb_n = int(signal_cfg.get("n", 20))
+        nb_pct = float(signal_cfg.get("pct", 0.03))
+        signal = generate_nearbottom_signals(df, n=nb_n, pct=nb_pct)
+        sig_desc = f"NearBottom(N={nb_n}, pct={nb_pct})"
+    else:
+        nd = int(signal_cfg.get("n_days", n_days))
+        signal = generate_nday_signals(df, n=nd)
+        sig_desc = f"NDay{nd}"
 
     if method == "fixed_horizon":
         horizon = kwargs.get("horizon", 5)
@@ -357,7 +380,7 @@ def run(n_days: int = 5, method: str = "sl_proximity", **kwargs) -> pd.DataFrame
         raise ValueError(f"Unknown method: {method}")
 
     print(f"[Labeling] SPY 数据: {len(df)} 天")
-    print(f"[Labeling] NDay{n_days} 信号数: {signal.sum()}")
+    print(f"[Labeling] 初级信号 {sig_desc} 数: {signal.sum()}")
     print(f"[Labeling] 方法: {desc}")
     print(f"[Labeling] 有效标签数: {len(labeled)}")
     print(f"[Labeling] 正标签比例: {labeled['label'].mean():.1%}")
