@@ -62,4 +62,8 @@ output/oos_proba_prec_*.csv
 output/oos_proba_n1n2_*.csv
 output/sweep_*.csv
 output/grid_search_*.csv
+output/ml_replay_*.json
 output/eval_by_label.csv
+
+# 盘中图表为可再生成的产物，不纳入版本控制（保留 csv/json 数据）
+data/intraday/**/*.png
