@@ -1,0 +1,77 @@
+{
+  "purpose": "空间 GT 参数遍历与 v3_n2 公平对比",
+  "pcts": [
+    0.0005,
+    0.001,
+    0.0015,
+    0.002,
+    0.0025,
+    0.003,
+    0.0035,
+    0.004,
+    0.006,
+    0.008,
+    0.01,
+    0.012,
+    0.015,
+    0.02,
+    0.025,
+    0.03
+  ],
+  "price_lambdas": [
+    0.0,
+    0.25,
+    0.5,
+    1.0,
+    2.0,
+    4.0
+  ],
+  "folds": 4,
+  "horizon_days": 28,
+  "development_period": [
+    "2005-01-01",
+    "2019-12-31"
+  ],
+  "final_test_period": [
+    "2020-01-01",
+    "2026-04-02"
+  ],
+  "common_oos_samples": 1369,
+  "common_oos_period": [
+    "2005-03-31",
+    "2026-04-02"
+  ],
+  "final_variant": "spatial_p0080_l025",
+  "final_pct": 0.008,
+  "final_price_lambda": 0.25,
+  "model_config": {
+    "n_estimators": 100,
+    "max_depth": 4,
+    "learning_rate": 0.1
+  },
+  "data_snapshot": [
+    {
+      "path": "data/SPY_adjusted.csv",
+      "rows_through_cutoff": 8351,
+      "last_date_in_file": "2026-07-30",
+      "sha256_through_cutoff": "4769cc9a761de2f91567df7c8676b3d2aa6c43da89d16d31d8879daaeef6d5da"
+    },
+    {
+      "path": "data/sp500_breadth.csv",
+      "rows_through_cutoff": 8350,
+      "last_date_in_file": "2026-07-30",
+      "sha256_through_cutoff": "1f23c18876f4b3ce55b5e8d8e6b853f0b8e398120c408d04bcaa9c9f26ca48a7"
+    },
+    {
+      "path": "data/vix_daily.csv",
+      "rows_through_cutoff": 9130,
+      "last_date_in_file": "2026-07-30",
+      "sha256_through_cutoff": "24ad0771f5745ca3ad60ea70727849463b81048aad308207db73c21ebab7c60f"
+    }
+  ],
+  "notes": [
+    "主对比只使用与仓库历史 v3_n2 OOS 文件重合的候选日。",
+    "数据哈希仅覆盖共同 OOS 截止日，文件末尾的新行情不影响主对比。",
+    "冻结上线模型比较使用截止当前文件末尾的数据，且样本量过小。"
+  ]
+}
