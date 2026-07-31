@@ -12,6 +12,7 @@
 |------|------|------|
 | ⭐ `eval_by_label.py` | **【权威】**用 label 列评估各 N 抓底 P/R，门槛决策主依据 | `python -m ml.research.eval_by_label` |
 | `eval_spatial_gt.py` | 空间 GT 参数遍历、价格权重消融、等预算离底溢价与 v3_n2 公平对比 | `python -m ml.research.eval_spatial_gt` |
+| `eval_spatial_e2e.py` | 开发段校准、下一开盘执行的空间 GT 因果端到端评估 | `python -m ml.research.eval_spatial_e2e` |
 | `diag_threshold_quality.py` | 秒级静态诊断：各 NDay 门槛信号数/质量/池内可分性 | `python -m ml.research.diag_threshold_quality` |
 | `sweep_ndays_precision_recall.py` | NDay 门槛遍历 P/R（label 口径） | `python -m ml.research.sweep_ndays_precision_recall` |
 | `plot_precision_recall.py` | 各 N 的 P-R 权衡曲线 + F1/F2（label 口径） | `python -m ml.research.plot_precision_recall` |
