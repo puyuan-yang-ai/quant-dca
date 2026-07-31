@@ -1,0 +1,62 @@
+{
+  "purpose": "空间 GT 两阶段端到端检测评估与人工审核数据",
+  "gt": {
+    "sl_n": 7,
+    "pct": 0.008,
+    "price_lambda": 0.25
+  },
+  "stage1": "NDay2",
+  "stage2": "XGBoost features_v3 walk-forward OOS",
+  "threshold": {
+    "type": "相对本折训练概率的分位数",
+    "value": 0.5
+  },
+  "common_oos_period": [
+    "2005-03-31",
+    "2026-04-02"
+  ],
+  "new_oos_period": [
+    "2005-03-31",
+    "2026-06-26"
+  ],
+  "final_test_period": [
+    "2020-01-01",
+    "2026-04-02"
+  ],
+  "bootstrap_samples": 2000,
+  "folds": [
+    {
+      "fold_id": 0,
+      "train_start": "1993-04-05",
+      "train_end": "2005-02-23",
+      "test_start": "2005-03-31",
+      "test_end": "2009-02-12"
+    },
+    {
+      "fold_id": 1,
+      "train_start": "1993-04-05",
+      "train_end": "2009-01-16",
+      "test_start": "2009-02-13",
+      "test_end": "2015-01-14"
+    },
+    {
+      "fold_id": 2,
+      "train_start": "1993-04-05",
+      "train_end": "2014-12-17",
+      "test_start": "2015-01-15",
+      "test_end": "2021-03-05"
+    },
+    {
+      "fold_id": 3,
+      "train_start": "1993-04-05",
+      "train_end": "2021-02-01",
+      "test_start": "2021-03-08",
+      "test_end": "2026-06-26"
+    }
+  ],
+  "notes": [
+    "Recall 分母为评价期全部空间 GT 日，Stage 1 漏掉的 GT 计入 FN。",
+    "Accuracy 因 TN 数量很大仅作辅助，主指标为 Precision/Recall/F1。",
+    "事件级预测单位为连续交易日最终信号形成的信号簇。"
+  ]
+}

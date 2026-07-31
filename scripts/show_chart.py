@@ -1,6 +1,7 @@
 """
 交互式图表查看脚本
 用法：bash show_chart.sh [--env bear|bull|bear-bull|bull-bear] [--strategy best|baseline] [--port 9870]
+空间 GT 审核：bash show_chart.sh --spatial-review [--review-no-serve]
 默认使用 bear-bull 环境 + best 最优策略
 """
 import os
@@ -249,11 +250,25 @@ def main():
     parser.add_argument('--czsc', action='store_true',
                         help='czsc 缠论专用视图：叠加分型/笔/中枢/一二三类买卖点，'
                              '并隐藏交易/Swing Low/ML 等原有标记与副图，画面更干净')
+    parser.add_argument('--spatial-review', action='store_true',
+                        help='生成空间 GT walk-forward OOS 人工审核图表')
+    parser.add_argument('--review-no-serve', action='store_true',
+                        help='空间 GT 审核模式下仅生成 HTML，不启动 HTTP 服务')
     args = parser.parse_args()
+
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if args.spatial_review:
+        from ml.research.build_spatial_gt_review import build_review_chart
+
+        build_review_chart(
+            output_dir=os.path.join(root, 'output'),
+            serve=not args.review_no_serve,
+            port=args.port,
+        )
+        return
 
     env = MARKET_ENVS[args.env]
     strat_config = STRATEGIES[args.strategy]
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
     if not args.czsc:
         print(f"策略：{strat_config['label']}")

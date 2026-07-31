@@ -1,11 +1,13 @@
 """
 信号生成 + 多种标注方法
 
-支持四种标注:
+支持六种标注:
   1. fixed_horizon: 固定N天远期收益 (原始方案)
   2. triple_barrier: 三重屏障法 (de Prado)
   3. relative_low: 相对低点评估 (买在窗口均价以下)
   4. sl_proximity: Swing Low 邻近度 (是否在底部区域)
+  5. sl_price_proximity: Swing Low 价格空间邻近度
+  6. sl_multi: 多尺度 Swing Low 邻近度
 """
 import sys
 import pandas as pd
@@ -276,6 +278,108 @@ def create_labels_sl_proximity(
     return labeled
 
 
+def build_sl_price_gt(
+    df: pd.DataFrame,
+    sl_n: int = 7,
+    pct: float = 0.008,
+) -> pd.DataFrame:
+    """
+    用 SL(sl_n) 生成全市场价格空间 GT。
+
+    SL 仅负责定义 GT 中心，不参与初级信号筛选。每个 SL 中心只在其自身
+    左右各 sl_n 根的定义窗口内生效；窗口内收盘价距离 SL 收盘价不超过 pct
+    的交易日标为正例。多个 SL 窗口重叠时，取价格溢价最小的中心。
+
+    时间窗口只限定局部 GT 的作用域，正负标签完全由价格空间距离决定。
+    """
+    if sl_n < 1:
+        raise ValueError("sl_n 必须 >= 1")
+    if not 0 < pct < 1:
+        raise ValueError("pct 必须位于 (0, 1) 区间")
+
+    from src.indicators import detect_swing_lows
+
+    close = df["close"].astype(float).to_numpy()
+    dates_list = df["date"].dt.strftime("%Y-%m-%d").tolist()
+    swing_lows = detect_swing_lows(close.tolist(), dates_list, sl_n)
+    sl_date_set = {s["date"] for s in swing_lows}
+    sl_positions = np.array(
+        [i for i, date_str in enumerate(dates_list) if date_str in sl_date_set],
+        dtype=int,
+    )
+
+    best_premium = np.full(len(df), np.nan, dtype=float)
+    best_distance = np.full(len(df), np.nan, dtype=float)
+
+    for sl_idx in sl_positions:
+        start = max(0, sl_idx - sl_n)
+        end = min(len(df), sl_idx + sl_n + 1)
+        bars = np.arange(start, end)
+        premiums = close[bars] / close[sl_idx] - 1
+
+        current = best_premium[bars]
+        better = np.isnan(current) | (premiums < current)
+        update_bars = bars[better]
+        best_premium[update_bars] = premiums[better]
+        best_distance[update_bars] = np.abs(update_bars - sl_idx)
+
+    is_gt = np.isfinite(best_premium) & (best_premium <= pct)
+    price_quality = np.zeros(len(df), dtype=float)
+    price_quality[is_gt] = np.clip(
+        1 - best_premium[is_gt] / pct,
+        0,
+        1,
+    )
+
+    return pd.DataFrame({
+        "is_sl_price_gt": is_gt,
+        "sl_price_premium": best_premium,
+        "sl_distance": best_distance,
+        "price_quality": price_quality,
+    }, index=df.index)
+
+
+def create_labels_sl_price_proximity(
+    df: pd.DataFrame,
+    signal: pd.Series,
+    sl_n: int = 7,
+    pct: float = 0.008,
+) -> pd.DataFrame:
+    """
+    Swing Low 价格空间标注。
+
+    对每个初级信号日，直接读取由 build_sl_price_gt 生成的全市场 GT。
+    label=1 表示该日收盘价距离局部 SL 收盘价不超过 pct。
+    price_quality 仅供训练样本权重使用，不得作为推理特征。
+    """
+    gt = build_sl_price_gt(df, sl_n=sl_n, pct=pct)
+    close = df["close"].astype(float).to_numpy()
+    signal_idx = np.where(signal.to_numpy())[0]
+
+    records = []
+    for idx in signal_idx:
+        entry_price = close[idx]
+        fwd_20 = close[idx + 20] / entry_price - 1 if idx + 20 < len(df) else np.nan
+
+        records.append({
+            "date": df.iloc[idx]["date"],
+            "open": df.iloc[idx]["open"],
+            "high": df.iloc[idx]["high"],
+            "low": df.iloc[idx]["low"],
+            "close": entry_price,
+            "volume": df.iloc[idx]["volume"],
+            "forward_return": fwd_20,
+            "label": int(gt.iloc[idx]["is_sl_price_gt"]),
+            "sl_price_premium": gt.iloc[idx]["sl_price_premium"],
+            "sl_distance": gt.iloc[idx]["sl_distance"],
+            "price_quality": gt.iloc[idx]["price_quality"],
+        })
+
+    labeled = pd.DataFrame(records)
+    labeled = labeled.dropna(subset=["forward_return"])
+    return labeled
+
+
 def create_labels_sl_multi(
     df: pd.DataFrame,
     signal: pd.Series,
@@ -336,7 +440,8 @@ def run(n_days: int = 5, method: str = "sl_proximity", signal_cfg: dict = None, 
     """
     完整流程：加载数据 → 生成信号 → 打标签
 
-    method: 'fixed_horizon' | 'triple_barrier' | 'relative_low' | 'sl_proximity'
+    method: 'fixed_horizon' | 'triple_barrier' | 'relative_low' |
+            'sl_proximity' | 'sl_price_proximity' | 'sl_multi'
     signal_cfg: 初级信号配置。{'type':'nearbottom','n':20,'pct':0.03} 用对称近底规则(路径A)；
                 否则用 NDay 门槛（n_days 或 signal_cfg['n_days']）。
     """
@@ -371,6 +476,11 @@ def run(n_days: int = 5, method: str = "sl_proximity", signal_cfg: dict = None, 
         k = kwargs.get("k", 3)
         labeled = create_labels_sl_proximity(df, signal, sl_n=sl_n, k=k)
         desc = f"SL{sl_n} Proximity (K={k}天)"
+    elif method == "sl_price_proximity":
+        sl_n = kwargs.get("sl_n", 7)
+        pct = kwargs.get("pct", 0.008)
+        labeled = create_labels_sl_price_proximity(df, signal, sl_n=sl_n, pct=pct)
+        desc = f"SL{sl_n} Price Proximity (pct={pct:.2%})"
     elif method == "sl_multi":
         sl_ns = kwargs.get("sl_ns", [5, 7])
         k = kwargs.get("k", 3)
